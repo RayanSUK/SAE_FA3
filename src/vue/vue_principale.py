@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+from modele.graphe import Couleur
 
 
 class VueApplication(ttk.Frame):
@@ -48,12 +49,26 @@ class VueApplication(ttk.Frame):
         )
         self.canvas_graphe.grid(row=0, column=0, sticky="nsew")
 
-        self.canvas_graphe.create_text(
-            20, 20,
-            anchor="nw",
-            text="Zone graphe (maquette)",
-            fill="#666"
-        )
+        # --- Grille ---
+        self.nb_lignes = 60
+        self.nb_colonnes = 80
+        self.taille_case = 25  # px (change si tu veux plus grand/petit)
+
+        self.rectangles_cases = [[None for _ in range(self.nb_colonnes)] for _ in range(self.nb_lignes)]
+
+        for lig in range(self.nb_lignes):
+            for col in range(self.nb_colonnes):
+                x1 = col * self.taille_case
+                y1 = lig * self.taille_case
+                x2 = x1 + self.taille_case
+                y2 = y1 + self.taille_case
+
+                rect_id = self.canvas_graphe.create_rectangle(
+                    x1, y1, x2, y2,
+                    fill="#ffffff",
+                    outline="#d0d0d0"
+                )
+                self.rectangles_cases[lig][col] = rect_id
 
     # ---------------- Zone Propriétés ----------------
     def construire_zone_proprietes(self):
@@ -85,6 +100,21 @@ class VueApplication(ttk.Frame):
             pass
 
         return conteneur, tuile
+    
+    def maj_case(self, lig, col, sommet):
+        rect = self.rectangles_cases[lig][col]
+
+        couleurs = {
+            Couleur.BLANC: "#ffffff",
+            Couleur.BLEU: "#2f6fed",
+            Couleur.VERT: "#2fa84f",
+            Couleur.JAUNE: "#f2d23a",
+        }
+
+        couleur = "#000000" if sommet.bloque else couleurs[sommet.cout]
+        
+        self.canvas_graphe.itemconfig(rect, fill=couleur)
+
 
     # ---------------- Propriétés ----------------
     def construire_proprietes(self, parent: ttk.Frame):
@@ -140,7 +170,7 @@ class VueApplication(ttk.Frame):
 
         ttk.Label(legende, text="● Départ", style="Legend.TLabel", foreground="purple") \
             .grid(row=0, column=0, sticky="w")
-        ttk.Label(legende, text="● Objectif", style="Legend.TLabel", foreground="red") \
+        ttk.Label(legende, text="● Arrivee", style="Legend.TLabel", foreground="red") \
             .grid(row=1, column=0, sticky="w")
 
         # ---- Option distances ----

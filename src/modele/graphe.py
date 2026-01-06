@@ -5,6 +5,7 @@ class Couleur(Enum):
     VERT = 2
     JAUNE = 3
     BLEU = 5
+    BLOQUE = 100000
 
 
 class Sommet:
@@ -55,9 +56,11 @@ class Graphe:
         return sommet.cout.value
 
     def bloquer_sommet(self, id: int):
+        print("En train de débloquer le sommet! (Depuis graphe/model)")
         self.obtenir_sommet(id).bloque = True
 
     def debloquer_sommet(self, id: int):
+        print("En train de débloquer le sommet! (Depuis graphe/model)")
         self.obtenir_sommet(id).bloque = False
 
     def definir_depart(self, id: int):
@@ -70,3 +73,25 @@ class Graphe:
         if id not in self.voisins:
             raise KeyError(f"Aucune liste de voisins pour le sommet {id}")
         return self.voisins[id]
+    
+def construire_graphe_grille(nb_lignes: int, nb_colonnes: int) -> Graphe:
+    sommets = {}
+    voisins = {}
+
+    def sommet_id(lig, col):
+        return lig * nb_colonnes + col
+
+    for lig in range(nb_lignes):
+        for col in range(nb_colonnes):
+            id = sommet_id(lig, col)
+
+            sommets[id] = Sommet(id)
+            voisins[id] = []
+
+            for dl, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nl, nc = lig + dl, col + dc
+                if 0 <= nl < nb_lignes and 0 <= nc < nb_colonnes:
+                    voisins[id].append(sommet_id(nl, nc))
+
+    return Graphe(sommets, voisins)
+
