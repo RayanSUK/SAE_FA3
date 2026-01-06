@@ -27,3 +27,30 @@ def bfs_pas_a_pas(graphe: Graphe):
             distances[v] = distances[courant] + 1
             parents[v] = courant
             file.append(v)
+
+def dfs_pas_a_pas(graphe: Graphe):
+    depart = graphe.depart
+    pile = [depart]
+    visites = set()
+    parents = {depart: None}
+
+    while pile:
+        courant = pile.pop()
+
+        if courant in visites:
+            continue
+
+        visites.add(courant)
+
+        yield {
+            "courant": courant,
+            "ouverts": set(pile),
+            "fermes": visites.copy(),
+            "parents": parents.copy()
+        }
+
+        for v in reversed(graphe.obtenir_voisins(courant)):
+            if graphe.obtenir_sommet(v).bloque or v in visites:
+                continue
+            parents[v] = courant
+            pile.append(v)
