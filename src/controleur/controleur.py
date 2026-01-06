@@ -26,6 +26,20 @@ class ControleurApplication:
 
         v.canvas_graphe.bind("<Button-1>", self.clic_grille)
 
+        # --- Lecture / Animation (placeholders) ---
+        v.bouton_reculer_etape.configure(command=self.reculer_etape)
+        v.bouton_lancer_pause.configure(command=self.lancer_ou_pause)
+        v.bouton_avancer_etape.configure(command=self.avancer_etape)
+
+
+    # Actions de lecture
+    def reculer_etape(self):
+        pass
+    def lancer_ou_pause(self):
+        pass
+    def avancer_etape(self):
+        pass
+
     def set_couleur(self, couleur):
         self.couleur_active = couleur
 
