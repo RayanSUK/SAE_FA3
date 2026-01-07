@@ -1,3 +1,5 @@
+import heapq
+import math
 from .graphe import Graphe, Sommet
 from collections import deque
 
@@ -54,3 +56,37 @@ def dfs_pas_a_pas(graphe: Graphe):
                 continue
             parents[v] = courant
             pile.append(v)
+
+def dijkstra_pas_a_pas(graphe: Graphe):
+    depart = graphe.depart
+    distances = {id: math.inf for id in graphe.sommets}
+    parents = {depart: None}
+    distances[depart] = 0
+
+    ouverts = [(0, depart)]
+    fermes = set()
+
+    while ouverts:
+        dist, u = heapq.heappop(ouverts)
+        if u in fermes:
+            continue
+
+        fermes.add(u)
+
+        yield {
+            "courant": u,
+            "ouverts": {x[1] for x in ouverts},
+            "fermes": fermes.copy(),
+            "distances": distances.copy(),
+            "parents": parents.copy()
+        }
+
+        for v in graphe.obtenir_voisins(u):
+            if graphe.obtenir_sommet(v).bloque:
+                continue
+
+            nouveau = distances[u] + graphe.obtenir_cout(v)
+            if nouveau < distances[v]:
+                distances[v] = nouveau
+                parents[v] = u
+                heapq.heappush(ouverts, (nouveau, v))
