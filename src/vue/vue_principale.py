@@ -121,8 +121,9 @@ class VueApplication(ttk.Frame):
         self.canvas_graphe.itemconfig(rect, fill=couleur)
 
     def id_vers_lig_col(self, id_sommet: int) -> tuple[int, int]:
-        lig = id_sommet // self.nb_colonnes
-        col = id_sommet % self.nb_colonnes
+        idx = id_sommet - 1
+        lig = idx // self.nb_colonnes
+        col = idx % self.nb_colonnes
         return lig, col
 
     def afficher_depart_arrivee(self, id_depart: int | None, id_arrivee: int | None):
