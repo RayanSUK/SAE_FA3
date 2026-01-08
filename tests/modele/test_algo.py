@@ -1,3 +1,4 @@
+from modulefinder import test
 import sys
 import os
 import pytest
@@ -6,7 +7,7 @@ import math
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 from collections import deque
 from src.modele.graphe import Graphe, Sommet, Couleur
-from src.modele.algorithmes import bfs_pas_a_pas, dfs_pas_a_pas, dijkstra_pas_a_pas, bellman_ford_pas_a_pas
+from src.modele.algorithmes import bfs_pas_a_pas, dfs_pas_a_pas, dijkstra_pas_a_pas, bellman_ford_pas_a_pas, composantes_connexes_pas_a_pas, minimum_dominating_set_pas_a_pas
 
 
 def test_bfs_pas_a_pas():
@@ -200,7 +201,7 @@ def test_bellman_ford_pas_a_pas():
 
     etapes = list(bellman_ford_pas_a_pas(graphe))
     print(*etapes, sep="\n")
-    
+
     assert len(etapes) > 0, "L'algorithme devrait produire au moins une étape"
 
     derniere_etape = etapes[-1]
@@ -218,4 +219,31 @@ def test_bellman_ford_pas_a_pas():
     assert parents_finaux[4] == 1
     assert parents_finaux[5] == 1
 
-test_dfs_pas_a_pas()
+def test_composantes_connexes():
+    """
+    Graphe de test :
+        1 -- 2     4
+              \
+               3
+    """
+    sommets = {i: Sommet(i) for i in range(1, 5)}
+
+    voisins = {
+        1: [2],
+        2: [1, 3],
+        3: [2],
+        4: []
+    }
+
+    graphe = Graphe(sommets=sommets, voisins=voisins)
+
+    etapes = list(composantes_connexes_pas_a_pas(graphe))
+    print(*etapes, sep="\n")
+    assert len(etapes) > 0
+
+    derniere = etapes[-1]
+    composantes = derniere["composantes"]
+
+    assert len(composantes) == 2
+    assert {1, 2, 3} in composantes.values()
+    assert {4} in composantes.values()
