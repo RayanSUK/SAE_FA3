@@ -1,7 +1,7 @@
 import tkinter as tk
 
 from vue.vue_principale import VueApplication
-from modele.graphe import Graphe, Sommet, construire_graphe_grille
+from modele.graphe import Graphe, Sommet
 from controleur.controleur import ControleurApplication
 
 
@@ -14,7 +14,7 @@ def main():
     vue = VueApplication(root)
 
     # Model
-    graphe = construire_graphe_grille(
+    graphe = Graphe.creer_graphe_parties(
         vue.nb_lignes,
         vue.nb_colonnes
     )
