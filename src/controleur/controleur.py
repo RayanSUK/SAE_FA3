@@ -30,6 +30,9 @@ class ControleurApplication:
         self.historique_etapes: list[dict] = []
         self.index_etape: int = -1  # -1 => aucune étape affichée encore
 
+        self._maj_progression_interne = False
+
+
 
     # ---------------- Utilitaires ----------------
     def sommet_id(self, lig, col):
@@ -86,6 +89,9 @@ class ControleurApplication:
         v.bouton_vitesse_05.configure(text="×1", command=lambda: self.set_vitesse(1))
         v.bouton_vitesse_1.configure(text="×4", command=lambda: self.set_vitesse(4))
         v.bouton_vitesse_2.configure(text="×8", command=lambda: self.set_vitesse(8))
+
+        v.curseur_progression.configure(command=self._progression_changee)
+
 
 
 
@@ -258,6 +264,9 @@ class ControleurApplication:
         self.historique_etapes = []
         self.index_etape = -1
 
+        self.vue.curseur_progression.set(0)
+
+
 
     def effacer_tout(self):
         # Stop animation
@@ -276,6 +285,7 @@ class ControleurApplication:
 
         # Remettre départ/arrivée par défaut
         self.remettre_points_par_defaut()
+        self.vue.curseur_progression.set(0)
 
     def _tick(self):
         """Animation automatique"""
@@ -343,6 +353,8 @@ class ControleurApplication:
             fermes = set()
 
         self.vue.afficher_etape(ouverts, fermes, courant, distances)
+        self._mettre_a_jour_progression()
+
 
     def set_vitesse(self, multiplicateur: int):
         """
@@ -366,6 +378,96 @@ class ControleurApplication:
 
             # Relance un tick immédiatement (il va reprogrammer le prochain avec le nouveau delai_ms)
             self._tick()
+
+    def _mettre_a_jour_progression(self):
+        """
+        La barre représente un index d'étape :
+        0 .. (total-1)
+        """
+        total = len(self.historique_etapes)
+        if total <= 0:
+            self._maj_progression_interne = True
+            self.vue.curseur_progression.configure(from_=0, to=0)
+            self.vue.curseur_progression.set(0)
+            self._maj_progression_interne = False
+            return
+
+        self._maj_progression_interne = True
+        self.vue.curseur_progression.configure(from_=0, to=total - 1)
+        self.vue.curseur_progression.set(self.index_etape)
+        self._maj_progression_interne = False
+
+    def _progression_changee(self, valeur):
+        """
+        L'utilisateur a bougé la barre => on saute à l'étape correspondante.
+        Simple : seulement en pause.
+        """
+
+        if self._maj_progression_interne:
+            return
+
+        if not self.en_pause:
+            return  # on évite de casser l'animation
+
+        if self.iterateur_algo is None and not self.historique_etapes:
+            return
+
+        try:
+            cible = int(float(valeur))
+        except Exception:
+            return
+
+        # Clamp (sécurité)
+        if cible < 0:
+            cible = 0
+
+        # Si la cible est déjà dans l'historique => affichage direct
+        if cible <= len(self.historique_etapes) - 1:
+            self.index_etape = cible
+            etape = self.historique_etapes[self.index_etape]
+
+            # Si un chemin final était tracé, on l'enlève (sinon incohérent)
+            if self.vue.ligne_chemin is not None:
+                try:
+                    self.vue.canvas_graphe.delete(self.vue.ligne_chemin)
+                except Exception:
+                    pass
+                self.vue.ligne_chemin = None
+
+            self._afficher_etape(etape)
+            return
+
+        # Sinon, on doit calculer des étapes jusqu'à atteindre la cible
+        # (sans animation, juste en consommant l'itérateur)
+        while len(self.historique_etapes) - 1 < cible:
+            if self.iterateur_algo is None:
+                break
+            try:
+                etape = next(self.iterateur_algo)
+            except StopIteration:
+                self.iterateur_algo = None
+                break
+
+            self.historique_etapes.append(etape)
+            self.index_etape = len(self.historique_etapes) - 1
+
+            # Stop si on atteint l'arrivée (on garde la fin)
+            if etape.get("courant") == self.graphe.arrivee:
+                parents = etape.get("parents")
+                if isinstance(parents, dict):
+                    chemin = chemin_depuis_parents(parents, self.graphe.arrivee)
+                    if chemin and chemin[0] == self.graphe.depart:
+                        self.vue.afficher_chemin(chemin)
+                self.iterateur_algo = None
+                break
+
+        # Afficher l'étape la plus proche atteinte
+        if self.historique_etapes:
+            self.index_etape = min(cible, len(self.historique_etapes) - 1)
+            self._afficher_etape(self.historique_etapes[self.index_etape])
+
+
+
 
 
 
