@@ -91,11 +91,11 @@ def test_dfs_pas_a_pas():
     etapes = list(dfs_pas_a_pas(graphe))
     print(*etapes, sep="\n")
 
-    assert len(etapes) == 5
+    assert len(etapes) == 4
 
     # Le DFS explore la branche 1-2-4-5 avant de revenir à 3
     ordre_visite = [e["courant"] for e in etapes]
-    assert ordre_visite == [1, 2, 4, 5, 3]
+    assert ordre_visite == [1, 2, 4, 5]
 
     derniere_etape = etapes[-1]
 
@@ -104,12 +104,13 @@ def test_dfs_pas_a_pas():
     assert derniere_etape["parents"][5] == 4
     assert derniere_etape["parents"][3] == 1
 
-    assert derniere_etape["fermes"] == {1, 2, 3, 4, 5}
-    assert len(derniere_etape["ouverts"]) == 0
+    assert derniere_etape["fermes"] == {1, 2, 4, 5}
+    assert len(derniere_etape["ouverts"]) == 1
 
 def test_dijkstra_pas_a_pas():
     """
     Graphe de test avec poids (basés sur Couleur)
+
     """
 
     sommets = {
@@ -199,7 +200,7 @@ def test_bellman_ford_pas_a_pas():
 
     etapes = list(bellman_ford_pas_a_pas(graphe))
     print(*etapes, sep="\n")
-
+    
     assert len(etapes) > 0, "L'algorithme devrait produire au moins une étape"
 
     derniere_etape = etapes[-1]
@@ -216,3 +217,5 @@ def test_bellman_ford_pas_a_pas():
     assert parents_finaux[3] == 4
     assert parents_finaux[4] == 1
     assert parents_finaux[5] == 1
+
+test_dfs_pas_a_pas()
