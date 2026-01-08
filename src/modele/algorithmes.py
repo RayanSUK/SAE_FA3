@@ -26,9 +26,9 @@ def bfs_pas_a_pas(graphe: Graphe):
             "parents": parents.copy()
         }
         for v in graphe.obtenir_voisins(courant):
-            if graphe.obtenir_sommet(v).bloque or v in distances:
+            if graphe.obtenir_sommet(v).bloque or v in visites:
                 continue
-            distances[v] = distances[courant] + 1
+            distances[v] = distances[courant] + graphe.obtenir_cout(v)
             parents[v] = courant
             file.append(v)
 
@@ -37,6 +37,7 @@ def dfs_pas_a_pas(graphe: Graphe):
     pile = [depart]
     visites = set()
     parents = {depart: None}
+    distances = {depart: 0}
     iteration = 0
 
     while pile:
@@ -53,12 +54,14 @@ def dfs_pas_a_pas(graphe: Graphe):
             "courant": courant,
             "ouverts": set(pile),
             "fermes": visites.copy(),
+            "distances": distances.copy(),
             "parents": parents.copy()
         }
 
         for v in reversed(graphe.obtenir_voisins(courant)):
             if graphe.obtenir_sommet(v).bloque or v in visites:
                 continue
+            distances[v] = distances[courant] + graphe.obtenir_cout(v)
             parents[v] = courant
             pile.append(v)
 
