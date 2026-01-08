@@ -247,3 +247,49 @@ def test_composantes_connexes():
     assert len(composantes) == 2
     assert {1, 2, 3} in composantes.values()
     assert {4} in composantes.values()
+
+def test_minimum_dominating_set_pas_a_pas():
+    """
+    Graphe de test :
+        1 -- 2 -- 3
+        |         |
+        4---------5
+    Sommets 3 bloqué
+    """
+
+    sommets = {i: Sommet(i) for i in range(1, 6)}
+    sommets[3].bloque = True
+
+    voisins = {
+        1: [2,4],
+        2: [1,3],
+        3: [2,5],
+        4: [1,5],
+        5: [3,4]
+    }
+
+    graphe = Graphe(
+        sommets=sommets,
+        voisins=voisins
+    )
+
+    etapes = list(minimum_dominating_set_pas_a_pas(graphe))
+    print(*etapes, sep="\n")
+
+    assert len(etapes) > 0
+
+    for etape in etapes:
+        assert 3 not in etape["ensemble_dominant"]
+
+    dernier = etapes[-1]
+    ensemble_dominant = dernier["ensemble_dominant"]
+    sommets_non_domines = dernier["sommets_non_domines"]
+    assert len(sommets_non_domines) == 0  # tous dominés
+
+    assert len(ensemble_dominant) > 0
+
+    # 1 domine 1,2,4 → suffisant, approximatif
+    assert 1 in ensemble_dominant or 2 in ensemble_dominant or 4 in ensemble_dominant
+
+    for etape in etapes:
+        assert etape["sommet_choisi"] in etape["ensemble_dominant"]

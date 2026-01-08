@@ -299,6 +299,56 @@ def composantes_connexes_pas_a_pas(graphe: Graphe):
                 if v not in visites and not graphe.obtenir_sommet(v).bloque:
                     file.append(v)
 
+def minimum_dominating_set_pas_a_pas(graphe: Graphe):
+    """
+    Générateur pas-à-pas pour approximer un ensemble dominant minimum
+    en utilisant une approche gloutonne.
+
+    L'idée :
+    - Tant qu'il reste des sommets non dominés
+    - Choisir le sommet qui domine le plus de sommets non encore dominés
+    - Ajouter ce sommet à l'ensemble dominant
+    - Retirer le sommet et ses voisins non bloqués de la liste des sommets non dominés
+    """
+    ensemble_dominant = set()
+    sommets_non_domines = {id for id, s in graphe.sommets.items() if not s.bloque}
+
+    iteration = 0
+
+    while sommets_non_domines:
+        meilleurs_score = -1
+        meilleur_sommet = None
+
+        for v in sommets_non_domines:
+            # Voisins non dominés et non bloqués
+            voisins_actifs = [u for u in graphe.obtenir_voisins(v)
+                              if u in sommets_non_domines and not graphe.obtenir_sommet(u).bloque]
+            score = 1 + len(voisins_actifs)  # lui-même + voisins
+            if score > meilleurs_score:
+                meilleurs_score = score
+                meilleur_sommet = v
+
+        # Ajout du sommet choisi à l'ensemble dominant
+        ensemble_dominant.add(meilleur_sommet)
+
+        # Retrait du sommet et tous ses voisins non bloqués de la liste des non-dominés
+        sommets_a_supprimer = {meilleur_sommet}
+        sommets_a_supprimer.update(u for u in graphe.obtenir_voisins(meilleur_sommet)
+                                   if not graphe.obtenir_sommet(u).bloque)
+        sommets_non_domines -= sommets_a_supprimer
+
+        iteration += 1
+
+        yield {
+            "iteration": iteration,
+            "sommet_choisi": meilleur_sommet,
+            "ensemble_dominant": ensemble_dominant.copy(),
+            "sommets_non_domines": sommets_non_domines.copy(),
+            "sommets_domines": {k for k in graphe.sommets.keys() if k not in sommets_non_domines}.copy()
+        }
+
+    return ensemble_dominant
+
 def chemin_depuis_parents(
         parents: dict[int, int | None],
         arrivee: int
