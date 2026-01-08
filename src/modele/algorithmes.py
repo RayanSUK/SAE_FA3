@@ -155,3 +155,11 @@ def bellman_ford_pas_a_pas(graphe: Graphe):
                         "cycle_negatif": True
                     }
                     return
+
+def chemin_depuis_parents(parents: dict[int, int | None], arrivee: int) -> list[int]:
+    """
+    Reconstruit le chemin depuis la table des parents.
+    """
+    if parents[arrivee] is None:
+        return [arrivee]
+    return chemin_depuis_parents(parents, parents[arrivee]) + [arrivee]
