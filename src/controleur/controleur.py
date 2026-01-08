@@ -33,6 +33,10 @@ class ControleurApplication:
 
         self.algo_courant = None
 
+        self._drag_actif = False
+        self._drag_last_case = None  # (lig, col)
+        self._drag_noir_valeur = None
+
     # ---------------- Utilitaires ----------------
     def sommet_id(self, lig, col):
         return lig * self.vue.nb_colonnes + col + 1
@@ -70,7 +74,9 @@ class ControleurApplication:
         v.tuile_vert.bind("<Button-1>", lambda e: self.set_couleur(Couleur.VERT))
         v.tuile_jaune.bind("<Button-1>", lambda e: self.set_couleur(Couleur.JAUNE))
 
-        v.canvas_graphe.bind("<Button-1>", self.clic_grille)
+        v.canvas_graphe.bind("<Button-1>", self._mouse_down)
+        v.canvas_graphe.bind("<B1-Motion>", self._mouse_drag)
+        v.canvas_graphe.bind("<ButtonRelease-1>", self._mouse_up)
 
         # --- Lecture / Animation (placeholders) ---
         v.bouton_reculer_etape.configure(command=self.reculer_etape)
@@ -200,24 +206,8 @@ class ControleurApplication:
             self.vue.afficher_depart_arrivee(self.graphe.depart, self.graphe.arrivee)
             return
 
-        # ne pas modifier la case départ/arrivée (pour l’instant)
-        if id_sommet == self.graphe.depart or id_sommet == self.graphe.arrivee:
-            return
-        sommet = self.graphe.obtenir_sommet(id_sommet)
-
-        # MAJ MODELE
-        if self.couleur_active is None:
-            sommet.bloque = not sommet.bloque
-        else:
-            sommet.bloque = False
-            self.graphe.definir_cout(id_sommet, self.couleur_active)
-
-        # MAJ VUE via la méthode de la vue
-        print("Sommet cliqué!", sommet.bloque)
-        self.vue.maj_case(lig, col, sommet)
-
-        # on redessine départ/arrivée au-dessus (au cas où)
-        self.vue.afficher_depart_arrivee(self.graphe.depart, self.graphe.arrivee)
+        # MODE NORMAL : une seule ligne
+        self._appliquer_case(lig, col)
 
     def lancer_algorithme(self):
         algo = self.vue.liste_algo.get()
@@ -539,6 +529,79 @@ class ControleurApplication:
             "Couleurs (hors départ): " + ", ".join([f"{k}={v}" for k, v in stats.items() if v > 0])
         )
         self.vue.logs_append(f"Coût total (hors départ): {cout_total}")
+
+    def _mouse_down(self, event):
+        self._drag_actif = True
+        self._drag_last_case = None
+        self._drag_noir_valeur = None
+
+        col = event.x // self.vue.taille_case
+        lig = event.y // self.vue.taille_case
+        if not (0 <= lig < self.vue.nb_lignes and 0 <= col < self.vue.nb_colonnes):
+            return
+
+        # Si on place depart/arrivee => on garde ton clic_grille normal (1 seul placement)
+        if self.mode_selection in ("depart", "arrivee"):
+            self.clic_grille(event)
+            self._drag_actif = False
+            return
+
+        # Normal => on prépare l'action stable du noir AVANT d'appliquer
+        id_sommet = self.sommet_id(lig, col)
+        if self.couleur_active is None:
+            sommet = self.graphe.obtenir_sommet(id_sommet)
+            self._drag_noir_valeur = (not sommet.bloque)  # True => bloquer, False => débloquer
+
+        # On applique la 1ère case (clic simple) avec la même logique que le drag
+        self._appliquer_case(lig, col)
+
+    def _mouse_drag(self, event):
+        if not self._drag_actif:
+            return
+
+        # pas de drag si on place depart/arrivee
+        if self.mode_selection in ("depart", "arrivee"):
+            return
+
+        col = event.x // self.vue.taille_case
+        lig = event.y // self.vue.taille_case
+        if not (0 <= lig < self.vue.nb_lignes and 0 <= col < self.vue.nb_colonnes):
+            return
+
+        if self._drag_last_case == (lig, col):
+            return
+
+        self._appliquer_case(lig, col)
+
+    def _mouse_up(self, event):
+        self._drag_actif = False
+        self._drag_last_case = None
+        self._drag_noir_valeur = None
+
+    def _appliquer_case(self, lig: int, col: int):
+        self._drag_last_case = (lig, col)
+
+        id_sommet = self.sommet_id(lig, col)
+
+        # ne pas modifier depart/arrivee
+        if id_sommet == self.graphe.depart or id_sommet == self.graphe.arrivee:
+            return
+
+        sommet = self.graphe.obtenir_sommet(id_sommet)
+
+        # Noir
+        if self.couleur_active is None:
+            if self._drag_noir_valeur is None:
+                sommet.bloque = not sommet.bloque
+            else:
+                sommet.bloque = self._drag_noir_valeur
+        else:
+            sommet.bloque = False
+            self.graphe.definir_cout(id_sommet, self.couleur_active)
+
+        self.vue.maj_case(lig, col, sommet)
+        self.vue.afficher_depart_arrivee(self.graphe.depart, self.graphe.arrivee)
+
 
 
 
