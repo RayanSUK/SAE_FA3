@@ -70,3 +70,35 @@ class Graphe:
         if id not in self.voisins:
             raise KeyError(f"Aucune liste de voisins pour le sommet {id}")
         return self.voisins[id]
+
+    @classmethod
+    def creer_graphe_parties(cls, largeur, hauteur):
+        sommets = {}
+        voisins = {}
+
+        for y in range(hauteur):
+            for x in range(largeur):
+                id = y * largeur + x + 1
+
+                sommets[id] = Sommet(id)
+                liste_voisins = []
+
+                # Voisin de droite (x + 1)
+                if x < largeur - 1:
+                    liste_voisins.append(id + 1)
+
+                # Voisin de gauche (x - 1)
+                if x > 0:
+                    liste_voisins.append(id - 1)
+
+                # Voisin du bas (y + 1)
+                if y < hauteur - 1:
+                    liste_voisins.append(id + largeur)
+
+                # Voisin du haut (y - 1)
+                if y > 0:
+                    liste_voisins.append(id - largeur)
+
+                voisins[id] = liste_voisins
+
+        return cls(sommets, voisins)
