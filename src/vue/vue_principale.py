@@ -248,7 +248,7 @@ class VueApplication(ttk.Frame):
 
         self.liste_algo = ttk.Combobox(
             parent,
-            values=["DFS", "Bellman-Ford", "A*"],
+            values=["DFS", "Bellman-Ford", "BFS", "Dijkstra"],
             state="readonly"
         )
 
