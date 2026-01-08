@@ -60,9 +60,9 @@ class VueApplication(ttk.Frame):
         self.canvas_graphe.grid(row=0, column=0, sticky="nsew")
 
         # --- Grille ---
-        self.nb_lignes = 60
-        self.nb_colonnes = 80
-        self.taille_case = 23  # px (change si tu veux plus grand/petit)
+        self.nb_lignes = 30
+        self.nb_colonnes = 44
+        self.taille_case = 45  # px (change si tu veux plus grand/petit)
 
         self.rectangles_cases = [[None for _ in range(self.nb_colonnes)] for _ in range(self.nb_lignes)]
 
