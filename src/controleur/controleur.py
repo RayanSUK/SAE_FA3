@@ -17,6 +17,9 @@ class ControleurApplication:
 
         self.lier_evenements()
         self.initialiser_depart_arrivee_par_defaut()
+
+        self.iterateur_algo = None
+        self.after_id = None
     # ---------------- Utilitaires ----------------
     def sommet_id(self, lig, col):
         return lig * self.vue.nb_colonnes + col + 1
@@ -65,6 +68,9 @@ class ControleurApplication:
         v.bouton_placer_depart.configure(command=self.activer_mode_depart)
         v.bouton_placer_arrivee.configure(command=self.activer_mode_arrivee)
         v.bouton_points_par_defaut.configure(command=self.remettre_points_par_defaut)
+
+        v.bouton_effacer_resultat.configure(command=self.effacer_resultat)
+        v.bouton_effacer_tout.configure(command=self.effacer_tout)
 
 
     # Actions de lecture
@@ -144,9 +150,37 @@ class ControleurApplication:
 
         if algo == "DFS":
             visites = dfs_pas_a_pas(self.graphe)
-            self.vue.afficher_iteration(visites)
 
-        
+
+    def effacer_resultat(self):
+        if self.after_id is not None:
+            try:
+                self.vue.after_cancel(self.after_id)
+            except Exception:
+                pass
+            self._after_id = None
+
+        self.iterateur_algo = None
+        self.vue.effacer_resultat()
+
+    def effacer_tout(self):
+        # Stop animation
+        self.effacer_resultat()
+
+        # Reset modèle : débloquer + remettre coûts BLANC
+        for sommet in self.graphe.sommets.values():
+            sommet.bloque = False
+            sommet.cout = Couleur.BLANC
+
+        # Reset vue : remettre toutes les cases en blanc + contour normal
+        for lig in range(self.vue.nb_lignes):
+            for col in range(self.vue.nb_colonnes):
+                rect = self.vue.rectangles_cases[lig][col]
+                self.vue.canvas_graphe.itemconfig(rect, fill="#ffffff", outline="#d0d0d0", width=1)
+
+        # Remettre départ/arrivée par défaut
+        self.remettre_points_par_defaut()
+
         
 
 
