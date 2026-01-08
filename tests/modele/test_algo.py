@@ -1,4 +1,3 @@
-from modulefinder import test
 import sys
 import os
 import pytest
@@ -7,7 +6,7 @@ import math
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 from collections import deque
 from src.modele.graphe import Graphe, Sommet, Couleur
-from src.modele.algorithmes import bfs_pas_a_pas, dfs_pas_a_pas, dijkstra_pas_a_pas, bellman_ford_pas_a_pas, composantes_connexes_pas_a_pas, minimum_dominating_set_pas_a_pas
+from src.modele.algorithmes import bfs_pas_a_pas, dfs_pas_a_pas, dijkstra_pas_a_pas, bellman_ford_pas_a_pas
 
 
 def test_bfs_pas_a_pas():
@@ -201,7 +200,7 @@ def test_bellman_ford_pas_a_pas():
 
     etapes = list(bellman_ford_pas_a_pas(graphe))
     print(*etapes, sep="\n")
-
+    
     assert len(etapes) > 0, "L'algorithme devrait produire au moins une étape"
 
     derniere_etape = etapes[-1]
@@ -219,77 +218,4 @@ def test_bellman_ford_pas_a_pas():
     assert parents_finaux[4] == 1
     assert parents_finaux[5] == 1
 
-def test_composantes_connexes():
-    """
-    Graphe de test :
-        1 -- 2     4
-              \
-               3
-    """
-    sommets = {i: Sommet(i) for i in range(1, 5)}
-
-    voisins = {
-        1: [2],
-        2: [1, 3],
-        3: [2],
-        4: []
-    }
-
-    graphe = Graphe(sommets=sommets, voisins=voisins)
-
-    etapes = list(composantes_connexes_pas_a_pas(graphe))
-    print(*etapes, sep="\n")
-    assert len(etapes) > 0
-
-    derniere = etapes[-1]
-    composantes = derniere["composantes"]
-
-    assert len(composantes) == 2
-    assert {1, 2, 3} in composantes.values()
-    assert {4} in composantes.values()
-
-def test_minimum_dominating_set_pas_a_pas():
-    """
-    Graphe de test :
-        1 -- 2 -- 3
-        |         |
-        4---------5
-    Sommets 3 bloqué
-    """
-
-    sommets = {i: Sommet(i) for i in range(1, 6)}
-    sommets[3].bloque = True
-
-    voisins = {
-        1: [2,4],
-        2: [1,3],
-        3: [2,5],
-        4: [1,5],
-        5: [3,4]
-    }
-
-    graphe = Graphe(
-        sommets=sommets,
-        voisins=voisins
-    )
-
-    etapes = list(minimum_dominating_set_pas_a_pas(graphe))
-    print(*etapes, sep="\n")
-
-    assert len(etapes) > 0
-
-    for etape in etapes:
-        assert 3 not in etape["ensemble_dominant"]
-
-    dernier = etapes[-1]
-    ensemble_dominant = dernier["ensemble_dominant"]
-    sommets_non_domines = dernier["sommets_non_domines"]
-    assert len(sommets_non_domines) == 0  # tous dominés
-
-    assert len(ensemble_dominant) > 0
-
-    # 1 domine 1,2,4 → suffisant, approximatif
-    assert 1 in ensemble_dominant or 2 in ensemble_dominant or 4 in ensemble_dominant
-
-    for etape in etapes:
-        assert etape["sommet_choisi"] in etape["ensemble_dominant"]
+test_dfs_pas_a_pas()

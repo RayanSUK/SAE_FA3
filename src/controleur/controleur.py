@@ -1,7 +1,7 @@
 from modele.graphe import Couleur
 from vue.vue_principale import VueApplication
 from modele.algorithmes import bfs_pas_a_pas, dfs_pas_a_pas, dijkstra_pas_a_pas, bellman_ford_pas_a_pas, \
-    chemin_depuis_parents
+    chemin_depuis_parents, composantes_connexes_pas_a_pas, minimum_dominating_set_pas_a_pas
 
 class ControleurApplication:
     '''
@@ -12,6 +12,7 @@ class ControleurApplication:
         self.vue = vue
         self.graphe = graphe
         self.couleur_active = Couleur.BLANC
+        self._delai_ms = 30
 
         self.mode_selection = "normal"  # "normal" | "depart" | "arrivee"
 
@@ -291,6 +292,12 @@ class ControleurApplication:
             self.iterateur_algo = dijkstra_pas_a_pas(self.graphe)
         elif algo == "Bellman-Ford":
             self.iterateur_algo = bellman_ford_pas_a_pas(self.graphe)
+        elif algo == "Composantes Connexes":
+            self._iterateur_algo = composantes_connexes_pas_a_pas(self.graphe)
+            self._animer_composantes()
+        elif algo == "Ensemble Dominant":
+            self._iterateur_algo = minimum_dominating_set_pas_a_pas(self.graphe)
+            self._animer_ensemble_dominant()
         else:
             self.iterateur_algo = None
             return
@@ -441,6 +448,57 @@ class ControleurApplication:
 
         self.vue.afficher_etape(ouverts, fermes, courant, distances)
         self._mettre_a_jour_progression()
+
+    def _animer_composantes(self):
+        try:
+            etat = next(self._iterateur_algo)
+        except StopIteration:
+            print("[CONTROLEUR] Fin des composantes connexes.")
+            self._iterateur_algo = None
+            return
+
+        self.vue.afficher_composantes(
+            etat["composantes"],
+            etat["courant"],
+            etat["composante_id"]
+        )
+
+        self._after_id = self.vue.after(self._delai_ms, self._animer_composantes)
+
+    def _animer_ensemble_dominant(self):
+        if self._iterateur_algo is None:
+            return
+
+        try:
+            etat = next(self._iterateur_algo)
+        except StopIteration:
+            print("[CONTROLEUR] Fin : ensemble dominant approximé.")
+            self._iterateur_algo = None
+            return
+
+        # Mettre en évidence le sommet choisi
+        self.vue.mettre_en_evidence(etat["sommet_choisi"])
+
+        # On récupère les sommets bloqués pour les exclure du coloriage
+        sommets_blocs = etat["sommets_bloques"]
+        #{id for id, s in self.graphe.sommets.items() if s.bloque}
+
+        # Colorer les sommets de l'ensemble dominant (sauf bloqués)
+        ensemble_dominant = etat["ensemble_dominant"] - sommets_blocs
+        self.vue.colorer_sommets(ensemble_dominant, "orange")
+
+        # Colorer les sommets non dominés (sauf bloqués)
+        sommets_non_domines = etat["sommets_non_domines"] - sommets_blocs
+        self.vue.colorer_sommets(sommets_non_domines, "white")
+
+        # Colorer les sommets dominés mais pas dans l'ensemble dominant (sauf bloqués)
+        sommets_domines = (etat["sommets_domines"] - etat["ensemble_dominant"]) - sommets_blocs
+        self.vue.colorer_sommets(sommets_domines, "green")
+
+        # Relancer la prochaine itération
+        self._after_id = self.vue.after(self._delai_ms, self._animer_ensemble_dominant)
+
+
 
     def set_vitesse(self, multiplicateur: int):
         '''

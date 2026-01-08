@@ -5,6 +5,8 @@ class Couleur(Enum):
     VERT = 2
     JAUNE = 3
     BLEU = 5
+    BLOQUE = 100000
+
 
 class Sommet:
     def __init__(self, id: int):
@@ -54,9 +56,11 @@ class Graphe:
         return sommet.cout.value
 
     def bloquer_sommet(self, id: int):
+        print("En train de débloquer le sommet! (Depuis graphe/model)")
         self.obtenir_sommet(id).bloque = True
 
     def debloquer_sommet(self, id: int):
+        print("En train de débloquer le sommet! (Depuis graphe/model)")
         self.obtenir_sommet(id).bloque = False
 
     def definir_depart(self, id: int):
@@ -66,9 +70,6 @@ class Graphe:
         self.arrivee = self.obtenir_sommet(id).id
 
     def obtenir_voisins(self, id: int) -> list[int]:
-        """
-        Retourne la liste des voisins du sommet d'identifiant `id`.
-        """
         if id not in self.voisins:
             raise KeyError(f"Aucune liste de voisins pour le sommet {id}")
         return self.voisins[id]
