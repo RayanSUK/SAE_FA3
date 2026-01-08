@@ -15,8 +15,8 @@ def main():
 
     # Model
     graphe = Graphe.creer_graphe_parties(
+        vue.nb_colonnes,
         vue.nb_lignes,
-        vue.nb_colonnes
     )
 
     # Controller (glue)
