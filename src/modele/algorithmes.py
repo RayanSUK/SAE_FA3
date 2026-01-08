@@ -336,6 +336,7 @@ def minimum_dominating_set_pas_a_pas(graphe: Graphe):
         sommets_a_supprimer.update(u for u in graphe.obtenir_voisins(meilleur_sommet)
                                    if not graphe.obtenir_sommet(u).bloque)
         sommets_non_domines -= sommets_a_supprimer
+        sommets_bloques = {id for id, s in graphe.sommets.items() if s.bloque}
 
         iteration += 1
 
@@ -344,7 +345,8 @@ def minimum_dominating_set_pas_a_pas(graphe: Graphe):
             "sommet_choisi": meilleur_sommet,
             "ensemble_dominant": ensemble_dominant.copy(),
             "sommets_non_domines": sommets_non_domines.copy(),
-            "sommets_domines": {k for k in graphe.sommets.keys() if k not in sommets_non_domines}.copy()
+            "sommets_domines": {k for k in graphe.sommets.keys() if k not in sommets_non_domines and k not in sommets_bloques}.copy(),
+            "sommets_bloques": sommets_bloques.copy()
         }
 
     return ensemble_dominant

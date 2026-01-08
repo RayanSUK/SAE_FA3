@@ -35,21 +35,19 @@ class VueApplication(ttk.Frame):
         style.configure("Section.TLabel", font=("Segoe UI", 11, "bold"))
         style.configure("Legend.TLabel", font=("Segoe UI", 10, "bold"))
 
-    # ---------------- Layout principal ----------------
     def construire_layout(self):
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)   # graphe
-        self.columnconfigure(1, weight=0)   # propriétés
+        self.columnconfigure(1, weight=0)   # panneau propriétés
 
         self.construire_zone_graphe()
         self.construire_zone_proprietes()
 
-    # ---------------- Zone Graphe ----------------
     def construire_zone_graphe(self):
         self.zone_gauche = ttk.Frame(self)
         self.zone_gauche.grid(row=0, column=0, sticky="nsew", padx=(10, 8), pady=10)
-        self.zone_gauche.rowconfigure(0, weight=1)
-        self.zone_gauche.columnconfigure(0, weight=1)
+        self.zone_gauche.rowconfigure(0, weight=1)  # ligne du canvas prend tout
+        self.zone_gauche.columnconfigure(0, weight=1)  # colonne du canvas prend tout
 
         self.canvas_graphe = tk.Canvas(
             self.zone_gauche,
@@ -57,12 +55,13 @@ class VueApplication(ttk.Frame):
             highlightthickness=1,
             highlightbackground="#d0d0d0"
         )
-        self.canvas_graphe.grid(row=0, column=0, sticky="nsew")
+        self.canvas_graphe.grid(row=0, column=0, sticky="nsew")  # plein écran
+
 
         # --- Grille ---
         self.nb_lignes = 30
         self.nb_colonnes = 44
-        self.taille_case = 45  # px (change si tu veux plus grand/petit)
+        self.taille_case = 32  # px (change si tu veux plus grand/petit)
 
         self.rectangles_cases = [[None for _ in range(self.nb_colonnes)] for _ in range(self.nb_lignes)]
 
@@ -118,16 +117,20 @@ class VueApplication(ttk.Frame):
     def maj_case(self, lig, col, sommet):
         rect = self.rectangles_cases[lig][col]
 
-        couleurs = {
-            Couleur.BLANC: "#ffffff",
-            Couleur.BLEU: "#2f6fed",
-            Couleur.VERT: "#2fa84f",
-            Couleur.JAUNE: "#f2d23a",
-        }
-
-        couleur = "#000000" if sommet.bloque else couleurs[sommet.cout]
+        # Si couleur personnalisée, on l'utilise
+        if hasattr(self, "_couleurs_personnalisees") and sommet.id in self._couleurs_personnalisees:
+            couleur = self._couleurs_personnalisees[sommet.id]
+        else:
+            couleurs = {
+                Couleur.BLANC: "#ffffff",
+                Couleur.BLEU: "#2f6fed",
+                Couleur.VERT: "#2fa84f",
+                Couleur.JAUNE: "#f2d23a",
+            }
+            couleur = "#000000" if sommet.bloque else couleurs[sommet.cout]
 
         self.canvas_graphe.itemconfig(rect, fill=couleur)
+
 
     def id_vers_lig_col(self, id_sommet: int) -> tuple[int, int]:
         idx = id_sommet - 1
@@ -257,7 +260,7 @@ class VueApplication(ttk.Frame):
 
         self.liste_algo = ttk.Combobox(
             parent,
-            values=["DFS", "Bellman-Ford", "BFS", "Dijkstra"],
+            values=["DFS", "Bellman-Ford", "BFS", "Dijkstra", "Composantes Connexes", "Ensemble Dominant"],
             state="readonly"
         )
 
@@ -345,6 +348,8 @@ class VueApplication(ttk.Frame):
         self.logs_text.tag_configure("log_bold", font=("Consolas", 12, "bold"))
 
         self.logs_text.grid(row=0, column=0, sticky="nsew")
+        logs_frame.rowconfigure(0, weight=1)
+        logs_frame.columnconfigure(0, weight=1)
 
         logs_scroll = ttk.Scrollbar(logs_frame, orient="vertical", command=self.logs_text.yview)
         logs_scroll.grid(row=0, column=1, sticky="ns")
@@ -354,6 +359,25 @@ class VueApplication(ttk.Frame):
         logs_frame.rowconfigure(0, weight=1)
         logs_frame.columnconfigure(0, weight=1)
 
+
+
+        # Met en évidence un sommet spécifique (ex: sommet choisi)
+    def mettre_en_evidence(self, sommet_id: int):
+        lig, col = self.id_vers_lig_col(sommet_id)
+        rect = self.rectangles_cases[lig][col]
+        # On change l'outline pour le faire ressortir
+        self.canvas_graphe.itemconfig(rect, outline="red", width=3)
+
+    # Colorie un ensemble de sommets avec une couleur donnée
+    def colorer_sommets(self, sommets: set[int], couleur: str):
+        for sommet_id in sommets:
+            lig, col = self.id_vers_lig_col(sommet_id)
+            rect = self.rectangles_cases[lig][col]
+            self.canvas_graphe.itemconfig(rect, fill=couleur)
+            # On peut aussi stocker cette couleur dans un dict si besoin pour persister
+            if not hasattr(self, "_couleurs_personnalisees"):
+                self._couleurs_personnalisees = {}
+            self._couleurs_personnalisees[sommet_id] = couleur
 
 
     def _centre_case(self, lig: int, col: int) -> tuple[int, int]:
@@ -395,6 +419,7 @@ class VueApplication(ttk.Frame):
         lig, col = self.id_vers_lig_col(id_sommet)
         rect = self.rectangles_cases[lig][col]
         self.canvas_graphe.itemconfig(rect, outline=couleur, width=width)
+
 
     def _maj_texte_distance(self, id_sommet: int, valeur: int | float):
         """Affiche (ou met à jour) un texte de distance au centre de la case."""
@@ -507,6 +532,25 @@ class VueApplication(ttk.Frame):
 
         self.canvas_graphe.tag_raise(self.marqueur_depart)
         self.canvas_graphe.tag_raise(self.marqueur_arrivee)
+
+    def afficher_composantes(self, composantes, courant, composante_id):
+        palette = [
+            "#ef5350", "#42a5f5", "#66bb6a",
+            "#ffa726", "#ab47bc", "#26c6da"
+        ]
+
+        for cid, sommets in composantes.items():
+            couleur = palette[(cid - 1) % len(palette)]
+            for id_sommet in sommets:
+                lig, col = self.id_vers_lig_col(id_sommet)
+                rect = self.rectangles_cases[lig][col]
+                self.canvas_graphe.itemconfig(rect, fill=couleur)
+
+        # Courant mis en avant
+        lig, col = self.id_vers_lig_col(courant)
+        rect = self.rectangles_cases[lig][col]
+        self.canvas_graphe.itemconfig(rect, outline="black", width=3)
+
 
     def logs_clear(self):
         self.logs_text.configure(state="normal")
