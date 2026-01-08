@@ -227,6 +227,12 @@ class ControleurApplication:
         # stop animation précédente + reset affichage
         self.effacer_resultat()
 
+        # Logs
+        self.vue.logs_clear()
+        self.vue.logs_append(f"Algo: {algo}")
+        self.vue.logs_append(f"Départ: {self.graphe.depart}  Arrivée: {self.graphe.arrivee}")
+
+
         # reset historique
         self.historique_etapes = []
         self.index_etape = -1
@@ -297,6 +303,7 @@ class ControleurApplication:
             try:
                 etape = next(self.iterateur_algo)
             except StopIteration:
+                self._log_fin_execution(None)
                 self.iterateur_algo = None
                 self.after_id = None
                 self.en_pause = True
@@ -319,6 +326,8 @@ class ControleurApplication:
                 chemin = chemin_depuis_parents(parents, self.graphe.arrivee)
                 if chemin and chemin[0] == self.graphe.depart:
                     self.vue.afficher_chemin(chemin)
+
+            self._log_fin_execution(chemin)
 
             self.iterateur_algo = None
             self.after_id = None
@@ -468,6 +477,71 @@ class ControleurApplication:
         if self.historique_etapes:
             self.index_etape = min(cible, len(self.historique_etapes) - 1)
             self._afficher_etape(self.historique_etapes[self.index_etape])
+
+    def _cout_case(self, sommet) -> int:
+        # noir = bloqué
+        if sommet.bloque:
+            return 10**9
+
+        if sommet.cout == Couleur.BLANC:
+            return 1
+        if sommet.cout == Couleur.BLEU:
+            return 5
+        if sommet.cout == Couleur.VERT:
+            return 2
+        if sommet.cout == Couleur.JAUNE:
+            return 3
+        return 1
+
+    def _nom_couleur(self, sommet) -> str:
+        if sommet.bloque:
+            return "Noir"
+        if sommet.cout == Couleur.BLANC:
+            return "Blanc"
+        if sommet.cout == Couleur.BLEU:
+            return "Bleu"
+        if sommet.cout == Couleur.VERT:
+            return "Vert"
+        if sommet.cout == Couleur.JAUNE:
+            return "Jaune"
+        return "Blanc"
+
+    def _log_fin_execution(self, chemin: list[int] | None):
+        nb_etapes_algo = len(self.historique_etapes)
+
+        d = self.graphe.depart
+        a = self.graphe.arrivee
+        d_lig, d_col = self.vue.id_vers_lig_col(d)
+        a_lig, a_col = self.vue.id_vers_lig_col(a)
+
+        self.vue.logs_append(f"Arrivée: (lig={a_lig + 1}, col={a_col + 1})")
+        self.vue.logs_append(f"Nombre d'étapes (algo): {nb_etapes_algo}")
+
+        if not chemin:
+            self.vue.logs_append("Chemin: aucun (pas trouvé / pas disponible)")
+            return
+
+        # chemin en nombre de pas
+        nb_pas = max(0, len(chemin) - 1)
+
+        stats = {"Blanc": 0, "Bleu": 0, "Vert": 0, "Jaune": 0, "Noir": 0}
+        cout_total = 0
+
+        # on ignore le départ pour “cases traversées” + coût
+        for node_id in chemin[1:]:
+            sommet = self.graphe.obtenir_sommet(node_id)
+            nom = self._nom_couleur(sommet)
+            stats[nom] = stats.get(nom, 0) + 1
+            cout_total += self._cout_case(sommet)
+
+        self.vue.logs_append(f"Chemin: {len(chemin)} cases ({nb_pas} sauts)")
+        self.vue.logs_append(
+            "Couleurs (hors départ): " + ", ".join([f"{k}={v}" for k, v in stats.items() if v > 0])
+        )
+        self.vue.logs_append(f"Coût total (hors départ): {cout_total}")
+
+
+
 
 
 
