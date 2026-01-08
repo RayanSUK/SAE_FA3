@@ -25,6 +25,10 @@ def bfs_pas_a_pas(graphe: Graphe):
             "distances": distances.copy(),
             "parents": parents.copy()
         }
+
+        if courant == graphe.arrivee:
+            return
+        
         for v in graphe.obtenir_voisins(courant):
             if graphe.obtenir_sommet(v).bloque or v in visites:
                 continue
@@ -58,6 +62,9 @@ def dfs_pas_a_pas(graphe: Graphe):
             "parents": parents.copy()
         }
 
+        if courant == graphe.arrivee:
+            return
+        
         for v in reversed(graphe.obtenir_voisins(courant)):
             if graphe.obtenir_sommet(v).bloque or v in visites:
                 continue
@@ -91,6 +98,9 @@ def dijkstra_pas_a_pas(graphe: Graphe):
             "distances": distances.copy(),
             "parents": parents.copy()
         }
+
+        if u == graphe.arrivee:
+            return
 
         for v in graphe.obtenir_voisins(u):
             if graphe.obtenir_sommet(v).bloque:
