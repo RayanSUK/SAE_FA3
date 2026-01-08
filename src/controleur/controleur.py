@@ -3,8 +3,11 @@ from vue.vue_principale import VueApplication
 from modele.algorithmes import bfs_pas_a_pas, dfs_pas_a_pas, dijkstra_pas_a_pas, bellman_ford_pas_a_pas, \
     chemin_depuis_parents
 
-
 class ControleurApplication:
+    '''
+    Contrôleur principal de l'application
+    Gère les interactions entre la vue et le modèle (graphe + algorithmes)
+    '''
     def __init__(self, vue, graphe):
         self.vue = vue
         self.graphe = graphe
@@ -40,11 +43,13 @@ class ControleurApplication:
     # ---------------- Utilitaires ----------------
     def sommet_id(self, lig, col):
         return lig * self.vue.nb_colonnes + col + 1
-
-    def initialiser_depart_arrivee_par_defaut(self):
-        """
-        Définit un départ et une arrivée simples au lancement par défaut
-        """
+   
+    def initialiser_depart_arrivee_par_defaut(self):     
+        '''
+        Initialisation du départ et de l'arrivée par défaut
+        Départ en haut à gauche (0,0)
+        Arrivée en bas à droite (nb_lignes-1, nb_colonnes-1
+        '''
         depart = self.sommet_id(0, 0)
         arrivee = self.sommet_id(self.vue.nb_lignes - 1, self.vue.nb_colonnes - 1)
 
@@ -66,6 +71,17 @@ class ControleurApplication:
 
     # ---------------- Liaisons événements ----------------
     def lier_evenements(self):
+        '''
+        Liaisons des événements de la vue aux méthodes du contrôleur
+        1. Clic sur les tuiles de couleur pour changer la couleur active
+        2. Clic sur la grille pour modifier les sommets (via clic_grille)
+        3. Boutons de contrôle (reculer, lancer/pause, avancer)
+        4. Boutons de placement départ/arrivée
+        5. Boutons d'effacement (résultat / tout)
+        6. Boutons de vitesse (×1, ×4, ×8)
+        7. Curseur de progression
+        8. etc...
+        '''
         v = self.vue
 
         v.tuile_noir.bind("<Button-1>", lambda e: self.set_couleur(None))  # bloque
@@ -98,6 +114,13 @@ class ControleurApplication:
 
     # Actions de lecture
     def reculer_etape(self):
+        '''
+        Gestion du bouton reculer d'une étape
+        On ne recule que si on est en pause (comportement simple)
+        1. On enlève le chemin final si jamais il avait été tracé
+        2. On décrémente l'index d'étape
+        3. On affiche l'étape correspondante via _afficher_etape
+        '''
         # On ne recule que si on est en pause (comportement simple)
         if not self.en_pause:
             return
@@ -120,7 +143,13 @@ class ControleurApplication:
         etape = self.historique_etapes[self.index_etape]
         self._afficher_etape(etape)
 
+
     def lancer_ou_pause(self):
+        '''
+        Gestion du bouton lancer/pause
+        Si en pause => on lance l'animation automatique
+        Si en cours d'animation => on met en pause
+        '''
         # Toggle pause/play
         self.en_pause = not self.en_pause
         if not self.en_pause:
@@ -133,7 +162,14 @@ class ControleurApplication:
                     pass
                 self.after_id = None
 
+    
     def avancer_etape(self):
+        '''
+        Gestion de l'avancement d'une étape en mode pause
+        On avance d'une étape dans l'itérateur, ou on rejoue une étape déjà existante
+        1. Si on est en pause et qu'on a déjà des étapes "en avance" (après un retour arrière), on les rejoue
+        2. Sinon on lit une nouvelle étape depuis l'itérateur  
+        '''
         # Un seul pas si on est en pause
         if not self.en_pause:
             return
@@ -167,8 +203,21 @@ class ControleurApplication:
         self.couleur_active = couleur
         self.mode_selection = "normal"
 
-    # ---------------- Actions ----------------
+    
     def clic_grille(self, event):
+        '''
+        Gestion du clic sur la grille
+    
+        On détermine la case cliquée, grâce à une conversion des coordinées x,y du clic en ligne/colonne
+        Puis on agit en fonction du mode de sélection (normal / départ / arrivée)
+    
+        1. Mode départ : on définit le sommet cliqué comme le nouveau départ (si pas bloqué et pas arrivée)
+        2. Mode arrivée : on définit le sommet cliqué comme la nouvelle arrivée (si pas bloqué et pas départ)
+        3. Mode normal : on modifie le sommet cliqué
+            - Si couleur_active est None => on inverse bloqué / débloqué
+            - Sinon on définit le coût du sommet à la couleur active (et on débloque le sommet) 
+        On met ensuite à jour la vue via la méthode maj_case de la vue
+        '''
 
         print("En train de cliquer avec le controleur!")
 
@@ -210,6 +259,14 @@ class ControleurApplication:
         self._appliquer_case(lig, col)
 
     def lancer_algorithme(self):
+        '''
+        Gestion du bouton lancer l'algorithme
+        1. Récupère l'algorithme sélectionné dans la vue
+        2. Stoppe toute animation précédente + reset affichage
+        3. Reset historique
+        4. Initialise l'itérateur de l'algorithme choisi
+        5. Démarre l'animation automatique via _tick
+        '''
         algo = self.vue.liste_algo.get()
         self.algo_courant = algo
         print(f"[CONTROLEUR] Lancement de l'algorithme : {algo}")
@@ -244,6 +301,17 @@ class ControleurApplication:
         self._tick()
 
     def effacer_resultat(self):
+        '''
+        Docstring for effacer_resultat
+        
+        :param self: Description
+        :return: Description
+        1. On stoppe l'animation en cours (after_cancel)
+        2. On réinitialise l'itérateur + met en pause
+        3. On efface le résultat dans la vue (effacer_resultat)
+        4. On réinitialise l'historique des étapes + index
+        5. On remet la progression à 0
+        '''
         if self.after_id is not None:
             try:
                 self.vue.after_cancel(self.after_id)
@@ -261,6 +329,14 @@ class ControleurApplication:
         self.vue.curseur_progression.set(0)
 
     def effacer_tout(self):
+        '''
+        Gestion du bouton effacer tout
+        1. On stoppe l'animation en cours (effacer_resultat)
+        2. On réinitialise le modèle (débloquer tous les sommets + coûts BLANC)
+        3. On réinitialise la vue (remettre toutes les cases en blanc + contour normal)
+        4. On remet le départ/arrivée par défaut
+        5. On remet la progression à 0
+        '''
         # Stop animation
         self.effacer_resultat()
 
@@ -280,7 +356,15 @@ class ControleurApplication:
         self.vue.curseur_progression.set(0)
 
     def _tick(self):
-        """Animation automatique"""
+        '''
+        Gestion de l'animation automatique
+        1. Si en pause ou itérateur None, alors on ne fait rien
+        2. Si on a reculé puis relancé play, on rejoue d'abord l'historique
+        3. Sinon, on consomme une nouvelle étape depuis l'itérateur (-1)
+        4. On affiche l'étape via _afficher_etape
+        5. Si on atteint l'arrivée, on trace le chemin final et on stoppe l'animation
+        6. Sinon, on reprogramme un tick après delai_ms.
+        '''
         if self.en_pause or self.iterateur_algo is None:
             return
 
@@ -327,11 +411,15 @@ class ControleurApplication:
         self.after_id = self.vue.after(self.delai_ms, self._tick)
 
     def _afficher_etape(self, etape: dict):
-        """
-        Normalise l'étape pour la vue.
-        BFS/DFS/Dijkstra ont : ouverts / fermes / courant / distances / parents
-        Bellman-Ford n'a pas ouverts/fermes => on affiche surtout distances + courant
-        """
+        '''
+        Affiche une étape dans la vue. 
+        Utilisé par l'animation automatique et les boutons de contrôle manuel.
+        Met aussi à jour la progression.
+        Paramètre : etape (dict) avec clés "ouverts", "fermes", "courant, "distances", etc.
+        1. Récupère les données de l'étape
+        2. Appelle la méthode afficher_etape de la vue
+        3. Met à jour la progression via _mettre_a_jour_progression
+        '''
         ouverts = etape.get("ouverts", set())
         fermes = etape.get("fermes", set())
         courant = etape.get("courant", None)
@@ -356,10 +444,14 @@ class ControleurApplication:
         self._mettre_a_jour_progression()
 
     def set_vitesse(self, multiplicateur: int):
-        """
+        '''
+        Gestion du changement de vitesse
         Change la vitesse de l'animation.
         Plus le multiplicateur est grand, plus c'est rapide
-        """
+        1. On calcule le nouveau delai_ms en fonction du multiplicateur
+        2. Si l'animation est en cours, on annule le tick en cours et on relance un tick immédiatement
+        3. Le prochain tick sera programmé avec le nouveau delai_ms
+        '''
         if multiplicateur <= 0:
             return
 
@@ -379,10 +471,12 @@ class ControleurApplication:
             self._tick()
 
     def _mettre_a_jour_progression(self):
-        """
-        La barre représente un index d'étape :
-        0 .. (total-1)
-        """
+        '''
+        Met à jour la barre de progression en fonction de l'index d'étape actuel
+        1. Calcule le total d'étapes dans l'historique
+        2. Configure la barre de progression pour aller de 0 à total-1
+        3. Met la barre à l'index d'étape actuel
+        '''
         total = len(self.historique_etapes)
         if total <= 0:
             self._maj_progression_interne = True
@@ -397,10 +491,18 @@ class ControleurApplication:
         self._maj_progression_interne = False
 
     def _progression_changee(self, valeur):
-        """
+        '''
+        Gestion du changement de la barre de progression par l'utilisateur
         L'utilisateur a bougé la barre => on saute à l'étape correspondante.
         Simple : seulement en pause.
-        """
+        1. Si la mise à jour est interne (via _mettre_a_jour_progression), on ignore
+        2. Si on n'est pas en pause, on ignore (évite de casser l'animation)
+        3. Si on n'a pas d'itérateur et pas d'historique, on ignore
+        4. On convertit la valeur en entier (index cible)
+        5. Si la cible est dans l'historique, on affiche directement l'étape correspondante
+        6. Sinon, on calcule des étapes jusqu'à atteindre la cible (sans animation)
+        7. On affiche l'étape la plus proche atteinte
+        '''
 
         if self._maj_progression_interne:
             return
