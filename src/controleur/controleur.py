@@ -1,6 +1,7 @@
 from modele.graphe import Couleur
 from vue.vue_principale import VueApplication
-from modele.algorithmes import bfs_pas_a_pas, dfs_pas_a_pas, dijkstra_pas_a_pas, bellman_ford_pas_a_pas,chemin_depuis_parents
+from modele.algorithmes import bfs_pas_a_pas, dfs_pas_a_pas, dijkstra_pas_a_pas, bellman_ford_pas_a_pas, \
+    chemin_depuis_parents
 
 class ControleurApplication:
     '''
@@ -17,13 +18,11 @@ class ControleurApplication:
         print("<<< CONTROLEUR INITIALISE SANS PROBLEME >>>")
         self.vue.bouton_lancer_algo.config(command=self.lancer_algorithme)
 
-
         self.lier_evenements()
         self.initialiser_depart_arrivee_par_defaut()
 
         self.iterateur_algo = None
         self.after_id = None
-
 
         self.en_pause = True
         self.delai_base_ms = 100  # vitesse de base = ×1 (en ms)
@@ -35,7 +34,11 @@ class ControleurApplication:
 
         self._maj_progression_interne = False
 
+        self.algo_courant = None
 
+        self._drag_actif = False
+        self._drag_last_case = None  # (lig, col)
+        self._drag_noir_valeur = None
 
     # ---------------- Utilitaires ----------------
     def sommet_id(self, lig, col):
@@ -66,6 +69,7 @@ class ControleurApplication:
         self.mode_selection = "normal"
         self.initialiser_depart_arrivee_par_defaut()
 
+    # ---------------- Liaisons événements ----------------
     def lier_evenements(self):
         '''
         Liaisons des événements de la vue aux méthodes du contrôleur
@@ -86,7 +90,9 @@ class ControleurApplication:
         v.tuile_vert.bind("<Button-1>", lambda e: self.set_couleur(Couleur.VERT))
         v.tuile_jaune.bind("<Button-1>", lambda e: self.set_couleur(Couleur.JAUNE))
 
-        v.canvas_graphe.bind("<Button-1>", self.clic_grille)
+        v.canvas_graphe.bind("<Button-1>", self._mouse_down)
+        v.canvas_graphe.bind("<B1-Motion>", self._mouse_drag)
+        v.canvas_graphe.bind("<ButtonRelease-1>", self._mouse_up)
 
         # --- Lecture / Animation (placeholders) ---
         v.bouton_reculer_etape.configure(command=self.reculer_etape)
@@ -106,7 +112,7 @@ class ControleurApplication:
 
         v.curseur_progression.configure(command=self._progression_changee)
 
-
+    # Actions de lecture
     def reculer_etape(self):
         '''
         Gestion du bouton reculer d'une étape
@@ -165,19 +171,24 @@ class ControleurApplication:
         2. Sinon on lit une nouvelle étape depuis l'itérateur  
         '''
         # Un seul pas si on est en pause
-        if self.iterateur_algo is None:
-            return
         if not self.en_pause:
             return
 
-        # Si on a déjà des étapes "en avance" (après un retour arrière), on les rejoue
+        if not self.historique_etapes:
+            return
+
+        # 1) Si on a des étapes en avance dans l'historique, on peut avancer même si iterateur_algo est None
         if self.index_etape < len(self.historique_etapes) - 1:
             self.index_etape += 1
             etape = self.historique_etapes[self.index_etape]
             self._afficher_etape(etape)
             return
 
-        # Sinon on lit une nouvelle étape depuis l'itérateur
+        # 2) Sinon, on ne peut avancer que si l'algorithme n'est pas terminé
+        if self.iterateur_algo is None:
+            return
+
+        # 3) Lire une nouvelle étape depuis l'itérateur
         try:
             etape = next(self.iterateur_algo)
         except StopIteration:
@@ -244,25 +255,8 @@ class ControleurApplication:
             self.vue.afficher_depart_arrivee(self.graphe.depart, self.graphe.arrivee)
             return
 
-        # ne pas modifier la case départ/arrivée (pour l’instant)
-        if id_sommet == self.graphe.depart or id_sommet == self.graphe.arrivee:
-            return
-        sommet = self.graphe.obtenir_sommet(id_sommet)
-
-        # MAJ MODELE
-        if self.couleur_active is None:
-            sommet.bloque = not sommet.bloque
-        else:
-            sommet.bloque = False
-            self.graphe.definir_cout(id_sommet, self.couleur_active)
-
-
-        # MAJ VUE via la méthode de la vue
-        print("Sommet cliqué!", sommet.bloque)
-        self.vue.maj_case(lig, col, sommet)
-
-        # on redessine départ/arrivée au-dessus (au cas où)
-        self.vue.afficher_depart_arrivee(self.graphe.depart, self.graphe.arrivee)
+        # MODE NORMAL : une seule ligne
+        self._appliquer_case(lig, col)
 
     def lancer_algorithme(self):
         '''
@@ -274,15 +268,21 @@ class ControleurApplication:
         5. Démarre l'animation automatique via _tick
         '''
         algo = self.vue.liste_algo.get()
+        self.algo_courant = algo
         print(f"[CONTROLEUR] Lancement de l'algorithme : {algo}")
 
         # stop animation précédente + reset affichage
         self.effacer_resultat()
 
+        # Logs
+        self.vue.logs_clear()
+        self.vue.logs_append(f"Algo: {algo}")
+        self.vue.logs_append(f"Départ: {self.graphe.depart}  Arrivée: {self.graphe.arrivee}")
+
+
         # reset historique
         self.historique_etapes = []
         self.index_etape = -1
-
 
         if algo == "DFS":
             self.iterateur_algo = dfs_pas_a_pas(self.graphe)
@@ -323,12 +323,10 @@ class ControleurApplication:
         self.en_pause = True
         self.vue.effacer_resultat()
 
-
         self.historique_etapes = []
         self.index_etape = -1
 
         self.vue.curseur_progression.set(0)
-
 
     def effacer_tout(self):
         '''
@@ -379,6 +377,7 @@ class ControleurApplication:
             try:
                 etape = next(self.iterateur_algo)
             except StopIteration:
+                self._log_fin_execution(None)
                 self.iterateur_algo = None
                 self.after_id = None
                 self.en_pause = True
@@ -389,13 +388,20 @@ class ControleurApplication:
 
         self._afficher_etape(etape)
 
-        # Stop quand le courant == arrivée
-        if etape.get("courant") == self.graphe.arrivee:
+        # Stop sur goal seulement pour certains algos
+        stop_on_goal = self.algo_courant in {"DFS", "BFS", "Dijkstra"}
+
+        # Pour Bellman-Ford, on a parfois "destination" et on l'affiche comme courant
+        courant_visuel = etape.get("destination", etape.get("courant"))
+
+        if stop_on_goal and courant_visuel == self.graphe.arrivee:
             parents = etape.get("parents")
             if isinstance(parents, dict):
                 chemin = chemin_depuis_parents(parents, self.graphe.arrivee)
                 if chemin and chemin[0] == self.graphe.depart:
                     self.vue.afficher_chemin(chemin)
+
+            self._log_fin_execution(chemin)
 
             self.iterateur_algo = None
             self.after_id = None
@@ -436,7 +442,6 @@ class ControleurApplication:
 
         self.vue.afficher_etape(ouverts, fermes, courant, distances)
         self._mettre_a_jour_progression()
-
 
     def set_vitesse(self, multiplicateur: int):
         '''
@@ -547,8 +552,11 @@ class ControleurApplication:
             self.historique_etapes.append(etape)
             self.index_etape = len(self.historique_etapes) - 1
 
-            # Stop si on atteint l'arrivée (on garde la fin)
-            if etape.get("courant") == self.graphe.arrivee:
+            stop_on_goal = self.algo_courant in {"DFS", "BFS", "Dijkstra"}
+            courant_visuel = etape.get("destination", etape.get("courant"))
+
+            # Stop goal seulement si l'algo le permet
+            if stop_on_goal and courant_visuel == self.graphe.arrivee:
                 parents = etape.get("parents")
                 if isinstance(parents, dict):
                     chemin = chemin_depuis_parents(parents, self.graphe.arrivee)
@@ -562,13 +570,151 @@ class ControleurApplication:
             self.index_etape = min(cible, len(self.historique_etapes) - 1)
             self._afficher_etape(self.historique_etapes[self.index_etape])
 
+    def _cout_case(self, sommet) -> int:
+        # noir = bloqué
+        if sommet.bloque:
+            return 10**9
+
+        if sommet.cout == Couleur.BLANC:
+            return 1
+        if sommet.cout == Couleur.BLEU:
+            return 5
+        if sommet.cout == Couleur.VERT:
+            return 2
+        if sommet.cout == Couleur.JAUNE:
+            return 3
+        return 1
+
+    def _nom_couleur(self, sommet) -> str:
+        if sommet.bloque:
+            return "Noir"
+        if sommet.cout == Couleur.BLANC:
+            return "Blanc"
+        if sommet.cout == Couleur.BLEU:
+            return "Bleu"
+        if sommet.cout == Couleur.VERT:
+            return "Vert"
+        if sommet.cout == Couleur.JAUNE:
+            return "Jaune"
+        return "Blanc"
+
+    def _log_fin_execution(self, chemin: list[int] | None):
+        nb_etapes_algo = len(self.historique_etapes)
+
+        d = self.graphe.depart
+        a = self.graphe.arrivee
+        d_lig, d_col = self.vue.id_vers_lig_col(d)
+        a_lig, a_col = self.vue.id_vers_lig_col(a)
+
+        self.vue.logs_append(f"Arrivée: (lig={a_lig + 1}, col={a_col + 1})")
+        self.vue.logs_append(f"Nombre d'étapes (algo): {nb_etapes_algo}")
+
+        if not chemin:
+            self.vue.logs_append("Chemin: aucun (pas trouvé / pas disponible)")
+            return
+
+        # chemin en nombre de pas
+        nb_pas = max(0, len(chemin) - 1)
+
+        stats = {"Blanc": 0, "Bleu": 0, "Vert": 0, "Jaune": 0, "Noir": 0}
+        cout_total = 0
+
+        # on ignore le départ pour “cases traversées” + coût
+        for node_id in chemin[1:]:
+            sommet = self.graphe.obtenir_sommet(node_id)
+            nom = self._nom_couleur(sommet)
+            stats[nom] = stats.get(nom, 0) + 1
+            cout_total += self._cout_case(sommet)
+
+        self.vue.logs_append(f"Chemin: {len(chemin)} cases ({nb_pas} sauts)")
+        self.vue.logs_append(
+            "Couleurs (hors départ): " + ", ".join([f"{k}={v}" for k, v in stats.items() if v > 0])
+        )
+        self.vue.logs_append(f"Coût total (hors départ): {cout_total}")
+
+    def _mouse_down(self, event):
+        self._drag_actif = True
+        self._drag_last_case = None
+        self._drag_noir_valeur = None
+
+        col = event.x // self.vue.taille_case
+        lig = event.y // self.vue.taille_case
+        if not (0 <= lig < self.vue.nb_lignes and 0 <= col < self.vue.nb_colonnes):
+            return
+
+        # Si on place depart/arrivee => on garde ton clic_grille normal (1 seul placement)
+        if self.mode_selection in ("depart", "arrivee"):
+            self.clic_grille(event)
+            self._drag_actif = False
+            return
+
+        # Normal => on prépare l'action stable du noir AVANT d'appliquer
+        id_sommet = self.sommet_id(lig, col)
+        if self.couleur_active is None:
+            sommet = self.graphe.obtenir_sommet(id_sommet)
+            self._drag_noir_valeur = (not sommet.bloque)  # True => bloquer, False => débloquer
+
+        # On applique la 1ère case (clic simple) avec la même logique que le drag
+        self._appliquer_case(lig, col)
+
+    def _mouse_drag(self, event):
+        if not self._drag_actif:
+            return
+
+        # pas de drag si on place depart/arrivee
+        if self.mode_selection in ("depart", "arrivee"):
+            return
+
+        col = event.x // self.vue.taille_case
+        lig = event.y // self.vue.taille_case
+        if not (0 <= lig < self.vue.nb_lignes and 0 <= col < self.vue.nb_colonnes):
+            return
+
+        if self._drag_last_case == (lig, col):
+            return
+
+        self._appliquer_case(lig, col)
+
+    def _mouse_up(self, event):
+        self._drag_actif = False
+        self._drag_last_case = None
+        self._drag_noir_valeur = None
+
+    def _appliquer_case(self, lig: int, col: int):
+        self._drag_last_case = (lig, col)
+
+        id_sommet = self.sommet_id(lig, col)
+
+        # ne pas modifier depart/arrivee
+        if id_sommet == self.graphe.depart or id_sommet == self.graphe.arrivee:
+            return
+
+        sommet = self.graphe.obtenir_sommet(id_sommet)
+
+        # Noir
+        if self.couleur_active is None:
+            if self._drag_noir_valeur is None:
+                sommet.bloque = not sommet.bloque
+            else:
+                sommet.bloque = self._drag_noir_valeur
+        else:
+            sommet.bloque = False
+            self.graphe.definir_cout(id_sommet, self.couleur_active)
+
+        self.vue.maj_case(lig, col, sommet)
+        self.vue.afficher_depart_arrivee(self.graphe.depart, self.graphe.arrivee)
 
 
 
 
 
 
-        
+
+
+
+
+
+
 
 
 
