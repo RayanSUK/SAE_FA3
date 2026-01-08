@@ -121,8 +121,9 @@ class VueApplication(ttk.Frame):
         self.canvas_graphe.itemconfig(rect, fill=couleur)
 
     def id_vers_lig_col(self, id_sommet: int) -> tuple[int, int]:
-        lig = id_sommet // self.nb_colonnes
-        col = id_sommet % self.nb_colonnes
+        idx = id_sommet - 1
+        lig = idx // self.nb_colonnes
+        col = idx % self.nb_colonnes
         return lig, col
 
     def afficher_depart_arrivee(self, id_depart: int | None, id_arrivee: int | None):
@@ -314,32 +315,36 @@ class VueApplication(ttk.Frame):
         self.curseur_progression = ttk.Scale(parent, from_=0, to=100, orient="horizontal")
         self.curseur_progression.grid(row=22, column=0, sticky="ew")
 
+    def _centre_case(self, lig: int, col: int) -> tuple[int, int]:
+        x = col * self.taille_case + self.taille_case // 2
+        y = lig * self.taille_case + self.taille_case // 2
+        return x, y
+
+    def effacer_resultat(self):
+        """Efface uniquement le résultat/affichage de l'algorithme"""
+        if hasattr(self, "_ouverts_prev"):
+            for id_sommet in self._ouverts_prev:
+                lig, col = self.id_vers_lig_col(id_sommet)
+                rect = self.rectangles_cases[lig][col]
+                self.canvas_graphe.itemconfig(rect, outline="#d0d0d0", width=1)
+
+        if hasattr(self, "_fermes_prev"):
+            for id_sommet in self._fermes_prev:
+                lig, col = self.id_vers_lig_col(id_sommet)
+                rect = self.rectangles_cases[lig][col]
+                self.canvas_graphe.itemconfig(rect, outline="#d0d0d0", width=1)
+
+        self._ouverts_prev = set()
+        self._fermes_prev = set()
+
+        if hasattr(self, "ligne_chemin") and self.ligne_chemin is not None:
+            self.canvas_graphe.delete(self.ligne_chemin)
+            self.ligne_chemin = None
+
+        self.canvas_graphe.tag_raise(self.marqueur_depart)
+        self.canvas_graphe.tag_raise(self.marqueur_arrivee)
 
 
-    # ---- Dessin (Algorithme) ----
-    def afficher_iteration(self, visites):
-        if not hasattr(self, "textes"):
-            self.textes = {}
-
-        for iteration, etape in enumerate(visites):
-            id_sommet = etape["courant"]   # ← LA LIGNE QUI MANQUAIT
-
-            lig, col = self.id_vers_lig_col(id_sommet)
-
-            if (lig, col) in self.textes:
-                self.canvas_graphe.delete(self.textes[(lig, col)])
-
-            x = col * self.taille_case + self.taille_case // 2
-            y = lig * self.taille_case + self.taille_case // 2
-
-            text_id = self.canvas_graphe.create_text(
-                x, y,
-                text=str(iteration),
-                fill="black",
-                font=("Segoe UI", 9, "bold")
-            )
-
-            self.textes[(lig, col)] = text_id
 
 
 
