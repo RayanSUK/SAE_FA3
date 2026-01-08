@@ -1,4 +1,6 @@
 from modele.graphe import Couleur
+from vue.vue_principale import VueApplication
+from modele.algorithmes import bfs_pas_a_pas, dfs_pas_a_pas, dijkstra_pas_a_pas
 
 
 class ControleurApplication:
@@ -6,13 +8,45 @@ class ControleurApplication:
         self.vue = vue
         self.graphe = graphe
         self.couleur_active = Couleur.BLANC
+
+        self.mode_selection = "normal"  # "normal" | "depart" | "arrivee"
+
         print("<<< CONTROLEUR INITIALISE SANS PROBLEME >>>")
+        self.vue.bouton_lancer_algo.config(command=self.lancer_algorithme)
+
 
         self.lier_evenements()
+        self.initialiser_depart_arrivee_par_defaut()
 
+        self.iterateur_algo = None
+        self.after_id = None
     # ---------------- Utilitaires ----------------
     def sommet_id(self, lig, col):
-        return lig * self.vue.nb_colonnes + col
+        return lig * self.vue.nb_colonnes + col + 1
+
+    def initialiser_depart_arrivee_par_defaut(self):
+        """
+        Définit un départ et une arrivée simples au lancement par défaut
+        """
+        depart = self.sommet_id(0, 0)
+        arrivee = self.sommet_id(self.vue.nb_lignes - 1, self.vue.nb_colonnes - 1)
+
+        self.graphe.definir_depart(depart)
+        self.graphe.definir_arrivee(arrivee)
+
+        # Affichage dans la vue
+        self.vue.afficher_depart_arrivee(self.graphe.depart, self.graphe.arrivee)
+
+    def activer_mode_depart(self):
+        self.mode_selection = "depart"
+
+    def activer_mode_arrivee(self):
+        self.mode_selection = "arrivee"
+
+    def remettre_points_par_defaut(self):
+        self.mode_selection = "normal"
+        self.initialiser_depart_arrivee_par_defaut()
+
 
     # ---------------- Liaisons événements ----------------
     def lier_evenements(self):
@@ -31,6 +65,13 @@ class ControleurApplication:
         v.bouton_lancer_pause.configure(command=self.lancer_ou_pause)
         v.bouton_avancer_etape.configure(command=self.avancer_etape)
 
+        v.bouton_placer_depart.configure(command=self.activer_mode_depart)
+        v.bouton_placer_arrivee.configure(command=self.activer_mode_arrivee)
+        v.bouton_points_par_defaut.configure(command=self.remettre_points_par_defaut)
+
+        v.bouton_effacer_resultat.configure(command=self.effacer_resultat)
+        v.bouton_effacer_tout.configure(command=self.effacer_tout)
+
 
     # Actions de lecture
     def reculer_etape(self):
@@ -42,10 +83,13 @@ class ControleurApplication:
 
     def set_couleur(self, couleur):
         self.couleur_active = couleur
+        self.mode_selection = "normal"
 
     # ---------------- Actions ----------------
     def clic_grille(self, event):
+
         print("En train de cliquer avec le controleur!")
+
         col = event.x // self.vue.taille_case
         lig = event.y // self.vue.taille_case
 
@@ -53,18 +97,91 @@ class ControleurApplication:
             return
 
         id_sommet = self.sommet_id(lig, col)
+
+        if self.mode_selection == "depart":
+            sommet = self.graphe.obtenir_sommet(id_sommet)
+            if sommet.bloque:
+                return
+
+            # Empêche départ = arrivée
+            if id_sommet == self.graphe.arrivee:
+                return
+
+            self.graphe.definir_depart(id_sommet)
+            self.vue.afficher_depart_arrivee(self.graphe.depart, self.graphe.arrivee)
+            return
+
+        if self.mode_selection == "arrivee":
+            sommet = self.graphe.obtenir_sommet(id_sommet)
+            if sommet.bloque:
+                return
+
+            # Empêche arrivée = départ
+            if id_sommet == self.graphe.depart:
+                return
+
+            self.graphe.definir_arrivee(id_sommet)
+            self.vue.afficher_depart_arrivee(self.graphe.depart, self.graphe.arrivee)
+            return
+
+        # ne pas modifier la case départ/arrivée (pour l’instant)
+        if id_sommet == self.graphe.depart or id_sommet == self.graphe.arrivee:
+            return
         sommet = self.graphe.obtenir_sommet(id_sommet)
 
         # MAJ MODELE
-        if self.couleur_active is None:  # si tu veux un clic "bloqué"
+        if self.couleur_active is None:
             sommet.bloque = not sommet.bloque
         else:
             sommet.bloque = False
-            sommet.cout = self.couleur_active
+            self.graphe.definir_cout(id_sommet, self.couleur_active)
+
 
         # MAJ VUE via la méthode de la vue
         print("Sommet cliqué!", sommet.bloque)
         self.vue.maj_case(lig, col, sommet)
+
+        # on redessine départ/arrivée au-dessus (au cas où)
+        self.vue.afficher_depart_arrivee(self.graphe.depart, self.graphe.arrivee)
+
+    def lancer_algorithme(self):
+        algo = self.vue.liste_algo.get()
+        print(f"[CONTROLEUR] Lancement de l'algorithme : {algo}")
+
+        if algo == "DFS":
+            visites = dfs_pas_a_pas(self.graphe)
+
+
+    def effacer_resultat(self):
+        if self.after_id is not None:
+            try:
+                self.vue.after_cancel(self.after_id)
+            except Exception:
+                pass
+            self._after_id = None
+
+        self.iterateur_algo = None
+        self.vue.effacer_resultat()
+
+    def effacer_tout(self):
+        # Stop animation
+        self.effacer_resultat()
+
+        # Reset modèle : débloquer + remettre coûts BLANC
+        for sommet in self.graphe.sommets.values():
+            sommet.bloque = False
+            sommet.cout = Couleur.BLANC
+
+        # Reset vue : remettre toutes les cases en blanc + contour normal
+        for lig in range(self.vue.nb_lignes):
+            for col in range(self.vue.nb_colonnes):
+                rect = self.vue.rectangles_cases[lig][col]
+                self.vue.canvas_graphe.itemconfig(rect, fill="#ffffff", outline="#d0d0d0", width=1)
+
+        # Remettre départ/arrivée par défaut
+        self.remettre_points_par_defaut()
+
+        
 
 
 

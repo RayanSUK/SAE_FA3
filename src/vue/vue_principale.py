@@ -3,6 +3,7 @@ from tkinter import ttk
 from modele.graphe import Couleur
 
 
+
 class VueApplication(ttk.Frame):
     """
     interface graphique.
@@ -52,7 +53,7 @@ class VueApplication(ttk.Frame):
         # --- Grille ---
         self.nb_lignes = 60
         self.nb_colonnes = 80
-        self.taille_case = 25  # px (change si tu veux plus grand/petit)
+        self.taille_case = 23  # px (change si tu veux plus grand/petit)
 
         self.rectangles_cases = [[None for _ in range(self.nb_colonnes)] for _ in range(self.nb_lignes)]
 
@@ -69,6 +70,10 @@ class VueApplication(ttk.Frame):
                     outline="#d0d0d0"
                 )
                 self.rectangles_cases[lig][col] = rect_id
+
+        #  Marqueurs Départ / Arrivée
+        self.marqueur_depart = self.canvas_graphe.create_oval(0, 0, 0, 0, outline="purple", width=3)
+        self.marqueur_arrivee = self.canvas_graphe.create_oval(0, 0, 0, 0, outline="red", width=3)
 
     # ---------------- Zone Propriétés ----------------
     def construire_zone_proprietes(self):
@@ -114,6 +119,38 @@ class VueApplication(ttk.Frame):
         couleur = "#000000" if sommet.bloque else couleurs[sommet.cout]
 
         self.canvas_graphe.itemconfig(rect, fill=couleur)
+
+    def id_vers_lig_col(self, id_sommet: int) -> tuple[int, int]:
+        idx = id_sommet - 1
+        lig = idx // self.nb_colonnes
+        col = idx % self.nb_colonnes
+        return lig, col
+
+    def afficher_depart_arrivee(self, id_depart: int | None, id_arrivee: int | None):
+        """
+        Affiche visuellement le départ (violet) et l'arrivée (rouge) sur la grille.
+        On dessine juste un ovale
+        """
+        if id_depart is not None:
+            lig, col = self.id_vers_lig_col(id_depart)
+            self._placer_marqueur(self.marqueur_depart, lig, col)
+
+        if id_arrivee is not None:
+            lig, col = self.id_vers_lig_col(id_arrivee)
+            self._placer_marqueur(self.marqueur_arrivee, lig, col)
+
+        # Met les marqueurs au premier plan
+        self.canvas_graphe.tag_raise(self.marqueur_depart)
+        self.canvas_graphe.tag_raise(self.marqueur_arrivee)
+
+    def _placer_marqueur(self, marqueur_id: int, lig: int, col: int):
+        marge = 5
+        x1 = col * self.taille_case + marge
+        y1 = lig * self.taille_case + marge
+        x2 = (col + 1) * self.taille_case - marge
+        y2 = (lig + 1) * self.taille_case - marge
+        self.canvas_graphe.coords(marqueur_id, x1, y1, x2, y2)
+
 
 
     # ---------------- Propriétés ----------------
@@ -173,6 +210,27 @@ class VueApplication(ttk.Frame):
         ttk.Label(legende, text="● Arrivee", style="Legend.TLabel", foreground="red") \
             .grid(row=1, column=0, sticky="w")
 
+        # ---- Points (départ / arrivée) ----
+        ttk.Separator(parent).grid(row=6, column=0, sticky="ew", pady=(8, 8))
+
+        ttk.Label(parent, text="Points", style="Section.TLabel") \
+            .grid(row=7, column=0, sticky="w", pady=(0, 6))
+
+        points = ttk.Frame(parent)
+        points.grid(row=8, column=0, sticky="ew")
+        points.columnconfigure(0, weight=1)
+        points.columnconfigure(1, weight=1)
+
+        self.bouton_placer_depart = ttk.Button(points, text="Placer départ")
+        self.bouton_placer_arrivee = ttk.Button(points, text="Placer arrivée")
+
+        self.bouton_placer_depart.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        self.bouton_placer_arrivee.grid(row=0, column=1, sticky="ew", padx=(6, 0))
+
+        self.bouton_points_par_defaut = ttk.Button(parent, text="Points par défaut")
+        self.bouton_points_par_defaut.grid(row=9, column=0, sticky="ew", pady=(6, 0))
+
+
         # ---- Option distances ----
         self.var_afficher_distances = tk.BooleanVar(value=True)
         self.case_distances = ttk.Checkbutton(
@@ -180,30 +238,30 @@ class VueApplication(ttk.Frame):
             text="Afficher distances",
             variable=self.var_afficher_distances
         )
-        self.case_distances.grid(row=9, column=0, sticky="w", pady=8)
+        self.case_distances.grid(row=10, column=0, sticky="w", pady=8)
 
         # ---- Algorithme ----
-        ttk.Separator(parent).grid(row=6, column=0, sticky="ew", pady=8)
+        ttk.Separator(parent).grid(row=11, column=0, sticky="ew", pady=8)
 
         ttk.Label(parent, text="Algorithme", style="Section.TLabel") \
-            .grid(row=7, column=0, sticky="w", pady=(0, 6))
+            .grid(row=12, column=0, sticky="w", pady=(0, 6))
 
         self.liste_algo = ttk.Combobox(
             parent,
-            values=["Dijkstra", "Bellman-Ford", "A*"],
+            values=["DFS", "Bellman-Ford", "A*"],
             state="readonly"
         )
 
-        self.liste_algo.set("Dijkstra")
-        self.liste_algo.grid(row=8, column=0, sticky="ew")
+        self.liste_algo.set("DFS")
+        self.liste_algo.grid(row=13, column=0, sticky="ew")
 
         # ---- Bouton lancer ----
         self.bouton_lancer_algo = ttk.Button(parent, text="Lancer")
-        self.bouton_lancer_algo.grid(row=10, column=0, sticky="ew", pady=(8, 0))
+        self.bouton_lancer_algo.grid(row=14, column=0, sticky="ew", pady=(8, 0))
 
         # ---- Boutons bas ----
         bas = ttk.Frame(parent)
-        bas.grid(row=11, column=0, sticky="ew", pady=(10, 0))
+        bas.grid(row=15, column=0, sticky="ew", pady=(10, 0))
         bas.columnconfigure(0, weight=1)
         bas.columnconfigure(1, weight=1)
 
@@ -214,14 +272,14 @@ class VueApplication(ttk.Frame):
         self.bouton_effacer_tout.grid(row=0, column=1, padx=(6, 0), sticky="ew")
 
         # ---- Lecture de l'algorithme ----
-        ttk.Separator(parent).grid(row=12, column=0, sticky="ew", pady=(12, 10))
+        ttk.Separator(parent).grid(row=16, column=0, sticky="ew", pady=(12, 10))
 
         ttk.Label(parent, text="Lecture", style="Section.TLabel") \
-            .grid(row=13, column=0, sticky="w", pady=(0, 6))
+            .grid(row=17, column=0, sticky="w", pady=(0, 6))
 
         # Conteneur des boutons de contrôle (reculer / pause / avancer)
         conteneur_controles = ttk.Frame(parent)
-        conteneur_controles.grid(row=14, column=0, sticky="ew")
+        conteneur_controles.grid(row=18, column=0, sticky="ew")
 
         # Les boutons occupent toute la largeur disponible
         for i in range(3):
@@ -236,10 +294,10 @@ class VueApplication(ttk.Frame):
         self.bouton_avancer_etape.grid(row=0, column=2, sticky="ew", padx=(6, 0))
 
         # Réglage de la vitesse d'exécution
-        ttk.Label(parent, text="Vitesse").grid(row=15, column=0, sticky="w", pady=(10, 4))
+        ttk.Label(parent, text="Vitesse").grid(row=19, column=0, sticky="w", pady=(10, 4))
 
         conteneur_vitesse = ttk.Frame(parent)
-        conteneur_vitesse.grid(row=16, column=0, sticky="ew")
+        conteneur_vitesse.grid(row=20, column=0, sticky="ew")
 
         for i in range(3):
             conteneur_vitesse.columnconfigure(i, weight=1)
@@ -253,9 +311,41 @@ class VueApplication(ttk.Frame):
         self.bouton_vitesse_2.grid(row=0, column=2, sticky="ew", padx=2)
 
         # Barre de progression (avancement de l'algorithme)
-        ttk.Label(parent, text="Progression").grid(row=17, column=0, sticky="w", pady=(10, 2))
+        ttk.Label(parent, text="Progression").grid(row=21, column=0, sticky="w", pady=(10, 2))
         self.curseur_progression = ttk.Scale(parent, from_=0, to=100, orient="horizontal")
-        self.curseur_progression.grid(row=18, column=0, sticky="ew")
+        self.curseur_progression.grid(row=22, column=0, sticky="ew")
+
+    def _centre_case(self, lig: int, col: int) -> tuple[int, int]:
+        x = col * self.taille_case + self.taille_case // 2
+        y = lig * self.taille_case + self.taille_case // 2
+        return x, y
+
+    def effacer_resultat(self):
+        """Efface uniquement le résultat/affichage de l'algorithme"""
+        if hasattr(self, "_ouverts_prev"):
+            for id_sommet in self._ouverts_prev:
+                lig, col = self.id_vers_lig_col(id_sommet)
+                rect = self.rectangles_cases[lig][col]
+                self.canvas_graphe.itemconfig(rect, outline="#d0d0d0", width=1)
+
+        if hasattr(self, "_fermes_prev"):
+            for id_sommet in self._fermes_prev:
+                lig, col = self.id_vers_lig_col(id_sommet)
+                rect = self.rectangles_cases[lig][col]
+                self.canvas_graphe.itemconfig(rect, outline="#d0d0d0", width=1)
+
+        self._ouverts_prev = set()
+        self._fermes_prev = set()
+
+        if hasattr(self, "ligne_chemin") and self.ligne_chemin is not None:
+            self.canvas_graphe.delete(self.ligne_chemin)
+            self.ligne_chemin = None
+
+        self.canvas_graphe.tag_raise(self.marqueur_depart)
+        self.canvas_graphe.tag_raise(self.marqueur_arrivee)
+
+
+
 
 
 
