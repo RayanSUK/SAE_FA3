@@ -73,25 +73,35 @@ class Graphe:
         if id not in self.voisins:
             raise KeyError(f"Aucune liste de voisins pour le sommet {id}")
         return self.voisins[id]
-    
-def construire_graphe_grille(nb_lignes: int, nb_colonnes: int) -> Graphe:
-    sommets = {}
-    voisins = {}
 
-    def sommet_id(lig, col):
-        return lig * nb_colonnes + col
+    @classmethod
+    def creer_graphe_parties(cls, largeur, hauteur):
+        sommets = {}
+        voisins = {}
 
-    for lig in range(nb_lignes):
-        for col in range(nb_colonnes):
-            id = sommet_id(lig, col)
+        for y in range(hauteur):
+            for x in range(largeur):
+                id = y * largeur + x + 1
 
-            sommets[id] = Sommet(id)
-            voisins[id] = []
+                sommets[id] = Sommet(id)
+                liste_voisins = []
 
-            for dl, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                nl, nc = lig + dl, col + dc
-                if 0 <= nl < nb_lignes and 0 <= nc < nb_colonnes:
-                    voisins[id].append(sommet_id(nl, nc))
+                # Voisin de droite (x + 1)
+                if x < largeur - 1:
+                    liste_voisins.append(id + 1)
 
-    return Graphe(sommets, voisins)
+                # Voisin de gauche (x - 1)
+                if x > 0:
+                    liste_voisins.append(id - 1)
 
+                # Voisin du bas (y + 1)
+                if y < hauteur - 1:
+                    liste_voisins.append(id + largeur)
+
+                # Voisin du haut (y - 1)
+                if y > 0:
+                    liste_voisins.append(id - largeur)
+
+                voisins[id] = liste_voisins
+
+        return cls(sommets, voisins)
