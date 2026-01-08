@@ -16,6 +16,15 @@ class VueApplication(ttk.Frame):
         self.construire_style()
         self.construire_layout()
 
+        # --- Mémoire d'affichage (résultat algo) ---
+        self._ouverts_prev = set()
+        self._fermes_prev = set()
+        self._courant_prev = None
+
+        self._textes_distances = {}   # id_sommet -> id_canvas_text
+        self.ligne_chemin = None
+
+
     # ---------------- Style ----------------
     def construire_style(self):
         style = ttk.Style()
@@ -198,7 +207,7 @@ class VueApplication(ttk.Frame):
         ajouter_ligne_cout(0, "Noir",  "Bloqué")
         ajouter_ligne_cout(1, "Blanc", "1")
         ajouter_ligne_cout(2, "Bleu",  "5")
-        ajouter_ligne_cout(3, "Vert",  "3")
+        ajouter_ligne_cout(3, "Vert",  "2")
         ajouter_ligne_cout(4, "Jaune", "3")
 
         # ---- Légende ----
@@ -248,7 +257,7 @@ class VueApplication(ttk.Frame):
 
         self.liste_algo = ttk.Combobox(
             parent,
-            values=["DFS", "Bellman-Ford", "A*"],
+            values=["DFS", "Bellman-Ford", "BFS", "Dijkstra"],
             state="readonly"
         )
 
@@ -302,9 +311,9 @@ class VueApplication(ttk.Frame):
         for i in range(3):
             conteneur_vitesse.columnconfigure(i, weight=1)
 
-        self.bouton_vitesse_05 = ttk.Button(conteneur_vitesse, text="×0,5")
-        self.bouton_vitesse_1 = ttk.Button(conteneur_vitesse, text="×1")
-        self.bouton_vitesse_2 = ttk.Button(conteneur_vitesse, text="×2")
+        self.bouton_vitesse_05 = ttk.Button(conteneur_vitesse, text="×1")
+        self.bouton_vitesse_1 = ttk.Button(conteneur_vitesse, text="×4")
+        self.bouton_vitesse_2 = ttk.Button(conteneur_vitesse, text="×8")
 
         self.bouton_vitesse_05.grid(row=0, column=0, sticky="ew", padx=2)
         self.bouton_vitesse_1.grid(row=0, column=1, sticky="ew", padx=2)
@@ -343,6 +352,126 @@ class VueApplication(ttk.Frame):
 
         self.canvas_graphe.tag_raise(self.marqueur_depart)
         self.canvas_graphe.tag_raise(self.marqueur_arrivee)
+        self.effacer_distances()
+        self._courant_prev = None
+
+    def _set_outline_case(self, id_sommet: int, couleur: str, width: int = 2):
+        lig, col = self.id_vers_lig_col(id_sommet)
+        rect = self.rectangles_cases[lig][col]
+        self.canvas_graphe.itemconfig(rect, outline=couleur, width=width)
+
+    def _maj_texte_distance(self, id_sommet: int, valeur: int | float):
+        """Affiche (ou met à jour) un texte de distance au centre de la case."""
+        lig, col = self.id_vers_lig_col(id_sommet)
+        x, y = self._centre_case(lig, col)
+
+        # On n'affiche pas les distances infinies (sinon ça pollue l'écran)
+        if valeur == float("inf"):
+            return
+
+        txt = str(int(valeur)) if isinstance(valeur, (int, float)) else str(valeur)
+
+        if id_sommet in self._textes_distances:
+            self.canvas_graphe.itemconfig(self._textes_distances[id_sommet], text=txt)
+            self.canvas_graphe.coords(self._textes_distances[id_sommet], x, y)
+        else:
+            text_id = self.canvas_graphe.create_text(x, y, text=txt, font=("Segoe UI", 9, "bold"))
+            self._textes_distances[id_sommet] = text_id
+
+    def effacer_distances(self):
+        """Supprime tous les textes de distances."""
+        for _, text_id in self._textes_distances.items():
+            try:
+                self.canvas_graphe.delete(text_id)
+            except Exception:
+                pass
+        self._textes_distances = {}
+
+    def afficher_etape(
+        self,
+        ouverts: set[int],
+        fermes: set[int],
+        courant: int | None,
+        distances: dict[int, int | float] | None = None
+    ):
+        """
+        Affichage simple type 'hexa':
+        - OUVERTS : contour bleu
+        - FERMES : contour gris
+        - COURANT : contour violet plus épais
+        - Distances : texte si option cochée
+        """
+
+        # 1) Remettre à normal les cases qui sortent de "ouverts"
+        for id_sommet in (self._ouverts_prev - ouverts):
+            self._set_outline_case(id_sommet, "#d0d0d0", 1)
+
+        # 2) Remettre à normal les cases qui sortent de "fermes"
+        for id_sommet in (self._fermes_prev - fermes):
+            self._set_outline_case(id_sommet, "#d0d0d0", 1)
+
+        # 3) Appliquer style sur nouveaux ouverts / fermes
+        for id_sommet in (ouverts - self._ouverts_prev):
+            self._set_outline_case(id_sommet, "#1e90ff", 2)  # bleu
+
+        for id_sommet in (fermes - self._fermes_prev):
+            self._set_outline_case(id_sommet, "#808080", 2)  # gris
+
+        # 4) Ancien courant -> le remettre cohérent (ouvert/fermé/normal)
+        if self._courant_prev is not None:
+            prev = self._courant_prev
+            if prev in fermes:
+                self._set_outline_case(prev, "#808080", 2)
+            elif prev in ouverts:
+                self._set_outline_case(prev, "#1e90ff", 2)
+            else:
+                self._set_outline_case(prev, "#d0d0d0", 1)
+
+        # 5) Nouveau courant
+        if courant is not None:
+            self._set_outline_case(courant, "purple", 3)
+
+        # 6) Distances (option)
+        if self.var_afficher_distances.get() and distances is not None:
+            # On affiche uniquement celles qu'on connaît (distances dict)
+            for id_sommet, d in distances.items():
+                self._maj_texte_distance(id_sommet, d)
+        else:
+            self.effacer_distances()
+
+        # 7) Mémoriser pour le prochain tick
+        self._ouverts_prev = set(ouverts)
+        self._fermes_prev = set(fermes)
+        self._courant_prev = courant
+
+        # marqueurs au-dessus
+        self.canvas_graphe.tag_raise(self.marqueur_depart)
+        self.canvas_graphe.tag_raise(self.marqueur_arrivee)
+
+    def afficher_chemin(self, chemin: list[int]):
+        """Trace un polyline rouge pour le chemin final."""
+        if not chemin or len(chemin) < 2:
+            return
+
+        # Supprime ancien chemin
+        if self.ligne_chemin is not None:
+            try:
+                self.canvas_graphe.delete(self.ligne_chemin)
+            except Exception:
+                pass
+            self.ligne_chemin = None
+
+        points = []
+        for id_sommet in chemin:
+            lig, col = self.id_vers_lig_col(id_sommet)
+            x, y = self._centre_case(lig, col)
+            points.extend([x, y])
+
+        self.ligne_chemin = self.canvas_graphe.create_line(*points, fill="red", width=3)
+
+        self.canvas_graphe.tag_raise(self.marqueur_depart)
+        self.canvas_graphe.tag_raise(self.marqueur_arrivee)
+
 
 
 
