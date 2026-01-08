@@ -324,6 +324,38 @@ class VueApplication(ttk.Frame):
         self.curseur_progression = ttk.Scale(parent, from_=0, to=100, orient="horizontal")
         self.curseur_progression.grid(row=22, column=0, sticky="ew")
 
+        # ---- Logs ----
+        ttk.Separator(parent).grid(row=23, column=0, sticky="ew", pady=(12, 8))
+
+        ttk.Label(parent, text="Logs", style="Section.TLabel") \
+            .grid(row=24, column=0, sticky="w", pady=(0, 6))
+
+        logs_frame = ttk.Frame(parent)
+        logs_frame.grid(row=25, column=0, sticky="nsew")
+        parent.rowconfigure(25, weight=1)  # pour que ça prenne l'espace restant si possible
+
+        self.logs_text = tk.Text(
+            logs_frame,
+            height=8,
+            wrap="word",
+            state="disabled",
+            font=("Consolas", 12)
+        )
+        # Tag pour le gras (avant les :)
+        self.logs_text.tag_configure("log_bold", font=("Consolas", 12, "bold"))
+
+        self.logs_text.grid(row=0, column=0, sticky="nsew")
+
+        logs_scroll = ttk.Scrollbar(logs_frame, orient="vertical", command=self.logs_text.yview)
+        logs_scroll.grid(row=0, column=1, sticky="ns")
+
+        self.logs_text.configure(yscrollcommand=logs_scroll.set)
+
+        logs_frame.rowconfigure(0, weight=1)
+        logs_frame.columnconfigure(0, weight=1)
+
+
+
     def _centre_case(self, lig: int, col: int) -> tuple[int, int]:
         x = col * self.taille_case + self.taille_case // 2
         y = lig * self.taille_case + self.taille_case // 2
@@ -349,6 +381,10 @@ class VueApplication(ttk.Frame):
         if hasattr(self, "ligne_chemin") and self.ligne_chemin is not None:
             self.canvas_graphe.delete(self.ligne_chemin)
             self.ligne_chemin = None
+
+        if hasattr(self, "logs_text"):
+            self.logs_clear()
+
 
         self.canvas_graphe.tag_raise(self.marqueur_depart)
         self.canvas_graphe.tag_raise(self.marqueur_arrivee)
@@ -471,6 +507,35 @@ class VueApplication(ttk.Frame):
 
         self.canvas_graphe.tag_raise(self.marqueur_depart)
         self.canvas_graphe.tag_raise(self.marqueur_arrivee)
+
+    def logs_clear(self):
+        self.logs_text.configure(state="normal")
+        self.logs_text.delete("1.0", "end")
+        self.logs_text.configure(state="disabled")
+
+    def logs_append(self, message: str):
+        self.logs_text.configure(state="normal")
+
+        # position de début de la ligne
+        start_index = self.logs_text.index("end-1c")
+
+        # insère le message + retour ligne
+        self.logs_text.insert("end", message + "\n")
+
+        # Met en gras tout ce qui est avant le premier ":" (si présent)
+        colon_pos = message.find(":")
+        if colon_pos != -1:
+            # de start_index à start_index + colon_pos caractères
+            bold_start = start_index
+            bold_end = f"{start_index}+{colon_pos}c"
+            self.logs_text.tag_add("log_bold", bold_start, bold_end)
+
+        self.logs_text.see("end")
+        self.logs_text.configure(state="disabled")
+
+
+
+
 
 
 
