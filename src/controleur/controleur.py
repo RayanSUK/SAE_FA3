@@ -1,6 +1,6 @@
 from modele.graphe import Couleur
 from vue.vue_principale import VueApplication
-from modele.algorithmes import bfs_pas_a_pas, dfs_pas_a_pas, dijkstra_pas_a_pas
+from modele.algorithmes import bfs_pas_a_pas, dfs_pas_a_pas, dijkstra_pas_a_pas, bellman_ford_pas_a_pas,chemin_depuis_parents
 
 
 class ControleurApplication:
@@ -20,6 +20,12 @@ class ControleurApplication:
 
         self.iterateur_algo = None
         self.after_id = None
+
+
+        self.en_pause = True
+        self.delai_base_ms = 100  # vitesse de base = ×1 (en ms)
+        self.delai_ms = self.delai_base_ms
+
     # ---------------- Utilitaires ----------------
     def sommet_id(self, lig, col):
         return lig * self.vue.nb_colonnes + col + 1
@@ -72,14 +78,42 @@ class ControleurApplication:
         v.bouton_effacer_resultat.configure(command=self.effacer_resultat)
         v.bouton_effacer_tout.configure(command=self.effacer_tout)
 
+        v.bouton_vitesse_05.configure(text="×1", command=lambda: self.set_vitesse(1))
+        v.bouton_vitesse_1.configure(text="×4", command=lambda: self.set_vitesse(4))
+        v.bouton_vitesse_2.configure(text="×8", command=lambda: self.set_vitesse(8))
+
+
 
     # Actions de lecture
     def reculer_etape(self):
         pass
+
     def lancer_ou_pause(self):
-        pass
+        # Toggle pause/play
+        self.en_pause = not self.en_pause
+        if not self.en_pause:
+            self._tick()
+        else:
+            if self.after_id is not None:
+                try:
+                    self.vue.after_cancel(self.after_id)
+                except Exception:
+                    pass
+                self.after_id = None
     def avancer_etape(self):
-        pass
+        # Un seul pas si on est en pause
+        if self.iterateur_algo is None:
+            return
+        if not self.en_pause:
+            return
+
+        try:
+            etape = next(self.iterateur_algo)
+        except StopIteration:
+            self.iterateur_algo = None
+            return
+
+        self._afficher_etape(etape)
 
     def set_couleur(self, couleur):
         self.couleur_active = couleur
@@ -148,9 +182,24 @@ class ControleurApplication:
         algo = self.vue.liste_algo.get()
         print(f"[CONTROLEUR] Lancement de l'algorithme : {algo}")
 
-        if algo == "DFS":
-            visites = dfs_pas_a_pas(self.graphe)
+        # stop animation précédente + reset affichage
+        self.effacer_resultat()
 
+        if algo == "DFS":
+            self.iterateur_algo = dfs_pas_a_pas(self.graphe)
+        elif algo == "BFS":
+            self.iterateur_algo = bfs_pas_a_pas(self.graphe)
+        elif algo == "Dijkstra":
+            self.iterateur_algo = dijkstra_pas_a_pas(self.graphe)
+        elif algo == "Bellman-Ford":
+            self.iterateur_algo = bellman_ford_pas_a_pas(self.graphe)
+        else:
+            self.iterateur_algo = None
+            return
+
+        # on démarre en lecture auto
+        self.en_pause = False
+        self._tick()
 
     def effacer_resultat(self):
         if self.after_id is not None:
@@ -158,9 +207,10 @@ class ControleurApplication:
                 self.vue.after_cancel(self.after_id)
             except Exception:
                 pass
-            self._after_id = None
+            self.after_id = None
 
         self.iterateur_algo = None
+        self.en_pause = True
         self.vue.effacer_resultat()
 
     def effacer_tout(self):
@@ -180,6 +230,91 @@ class ControleurApplication:
 
         # Remettre départ/arrivée par défaut
         self.remettre_points_par_defaut()
+
+    def _tick(self):
+        """Animation automatique """
+        if self.en_pause or self.iterateur_algo is None:
+            return
+
+        try:
+            etape = next(self.iterateur_algo)
+        except StopIteration:
+            self.iterateur_algo = None
+            self.after_id = None
+            self.en_pause = True
+            return
+
+        self._afficher_etape(etape)
+
+        # Condition d'arrêt correcte : on stop quand le COURANT == ARRIVEE
+        # (important pour Dijkstra, sinon on s'arrêtes trop tôt)
+        if etape.get("courant") == self.graphe.arrivee:
+            parents = etape.get("parents")
+            if isinstance(parents, dict):
+                chemin = chemin_depuis_parents(parents, self.graphe.arrivee)
+                if chemin and chemin[0] == self.graphe.depart:
+                    self.vue.afficher_chemin(chemin)
+
+            self.iterateur_algo = None
+            self.after_id = None
+            self.en_pause = True
+            return
+
+        self.after_id = self.vue.after(self.delai_ms, self._tick)
+
+    def _afficher_etape(self, etape: dict):
+        """
+        Normalise l'étape pour la vue.
+        BFS/DFS/Dijkstra ont : ouverts / fermes / courant / distances / parents
+        Bellman-Ford n'a pas ouverts/fermes => on affiche surtout distances + courant
+        """
+        ouverts = etape.get("ouverts", set())
+        fermes = etape.get("fermes", set())
+        courant = etape.get("courant", None)
+        distances = etape.get("distances", None)
+
+        # Bellman-Ford : on peut afficher la destination comme "courant" visuel
+        if "destination" in etape:
+            courant = etape.get("destination", courant)
+
+        # sécu types
+        try:
+            ouverts = set(ouverts)
+        except Exception:
+            ouverts = set()
+
+        try:
+            fermes = set(fermes)
+        except Exception:
+            fermes = set()
+
+        self.vue.afficher_etape(ouverts, fermes, courant, distances)
+
+    def set_vitesse(self, multiplicateur: int):
+        """
+        Change la vitesse de l'animation.
+        Plus le multiplicateur est grand, plus c'est rapide
+        """
+        if multiplicateur <= 0:
+            return
+
+        self.delai_ms = max(1, int(self.delai_base_ms / multiplicateur))
+        print(f"[CONTROLEUR] Vitesse: x{multiplicateur} (delai={self.delai_ms}ms)")
+
+        # si l'animation est en cours, on applique la nouvelle vitesse tout de suite
+        if not self.en_pause and self.iterateur_algo is not None:
+            if self.after_id is not None:
+                try:
+                    self.vue.after_cancel(self.after_id)
+                except Exception:
+                    pass
+                self.after_id = None
+
+            # Relance un tick immédiatement (il va reprogrammer le prochain avec le nouveau delai_ms)
+            self._tick()
+
+
+
 
         
 
