@@ -1,6 +1,7 @@
 from modele.graphe import Couleur
 from vue.vue_principale import VueApplication
-from modele.algorithmes import bfs_pas_a_pas, dfs_pas_a_pas, dijkstra_pas_a_pas, bellman_ford_pas_a_pas,chemin_depuis_parents
+from modele.algorithmes import bfs_pas_a_pas, dfs_pas_a_pas, dijkstra_pas_a_pas, bellman_ford_pas_a_pas, \
+    chemin_depuis_parents
 
 
 class ControleurApplication:
@@ -14,13 +15,11 @@ class ControleurApplication:
         print("<<< CONTROLEUR INITIALISE SANS PROBLEME >>>")
         self.vue.bouton_lancer_algo.config(command=self.lancer_algorithme)
 
-
         self.lier_evenements()
         self.initialiser_depart_arrivee_par_defaut()
 
         self.iterateur_algo = None
         self.after_id = None
-
 
         self.en_pause = True
         self.delai_base_ms = 100  # vitesse de base = ×1 (en ms)
@@ -32,7 +31,7 @@ class ControleurApplication:
 
         self._maj_progression_interne = False
 
-
+        self.algo_courant = None
 
     # ---------------- Utilitaires ----------------
     def sommet_id(self, lig, col):
@@ -60,7 +59,6 @@ class ControleurApplication:
     def remettre_points_par_defaut(self):
         self.mode_selection = "normal"
         self.initialiser_depart_arrivee_par_defaut()
-
 
     # ---------------- Liaisons événements ----------------
     def lier_evenements(self):
@@ -91,9 +89,6 @@ class ControleurApplication:
         v.bouton_vitesse_2.configure(text="×8", command=lambda: self.set_vitesse(8))
 
         v.curseur_progression.configure(command=self._progression_changee)
-
-
-
 
     # Actions de lecture
     def reculer_etape(self):
@@ -134,19 +129,24 @@ class ControleurApplication:
 
     def avancer_etape(self):
         # Un seul pas si on est en pause
-        if self.iterateur_algo is None:
-            return
         if not self.en_pause:
             return
 
-        # Si on a déjà des étapes "en avance" (après un retour arrière), on les rejoue
+        if not self.historique_etapes:
+            return
+
+        # 1) Si on a des étapes en avance dans l'historique, on peut avancer même si iterateur_algo est None
         if self.index_etape < len(self.historique_etapes) - 1:
             self.index_etape += 1
             etape = self.historique_etapes[self.index_etape]
             self._afficher_etape(etape)
             return
 
-        # Sinon on lit une nouvelle étape depuis l'itérateur
+        # 2) Sinon, on ne peut avancer que si l'algorithme n'est pas terminé
+        if self.iterateur_algo is None:
+            return
+
+        # 3) Lire une nouvelle étape depuis l'itérateur
         try:
             etape = next(self.iterateur_algo)
         except StopIteration:
@@ -212,7 +212,6 @@ class ControleurApplication:
             sommet.bloque = False
             self.graphe.definir_cout(id_sommet, self.couleur_active)
 
-
         # MAJ VUE via la méthode de la vue
         print("Sommet cliqué!", sommet.bloque)
         self.vue.maj_case(lig, col, sommet)
@@ -222,6 +221,7 @@ class ControleurApplication:
 
     def lancer_algorithme(self):
         algo = self.vue.liste_algo.get()
+        self.algo_courant = algo
         print(f"[CONTROLEUR] Lancement de l'algorithme : {algo}")
 
         # stop animation précédente + reset affichage
@@ -230,7 +230,6 @@ class ControleurApplication:
         # reset historique
         self.historique_etapes = []
         self.index_etape = -1
-
 
         if algo == "DFS":
             self.iterateur_algo = dfs_pas_a_pas(self.graphe)
@@ -260,13 +259,10 @@ class ControleurApplication:
         self.en_pause = True
         self.vue.effacer_resultat()
 
-
         self.historique_etapes = []
         self.index_etape = -1
 
         self.vue.curseur_progression.set(0)
-
-
 
     def effacer_tout(self):
         # Stop animation
@@ -311,8 +307,13 @@ class ControleurApplication:
 
         self._afficher_etape(etape)
 
-        # Stop quand le courant == arrivée
-        if etape.get("courant") == self.graphe.arrivee:
+        # Stop sur goal seulement pour certains algos
+        stop_on_goal = self.algo_courant in {"DFS", "BFS", "Dijkstra"}
+
+        # Pour Bellman-Ford, on a parfois "destination" et on l'affiche comme courant
+        courant_visuel = etape.get("destination", etape.get("courant"))
+
+        if stop_on_goal and courant_visuel == self.graphe.arrivee:
             parents = etape.get("parents")
             if isinstance(parents, dict):
                 chemin = chemin_depuis_parents(parents, self.graphe.arrivee)
@@ -354,7 +355,6 @@ class ControleurApplication:
 
         self.vue.afficher_etape(ouverts, fermes, courant, distances)
         self._mettre_a_jour_progression()
-
 
     def set_vitesse(self, multiplicateur: int):
         """
@@ -451,8 +451,11 @@ class ControleurApplication:
             self.historique_etapes.append(etape)
             self.index_etape = len(self.historique_etapes) - 1
 
-            # Stop si on atteint l'arrivée (on garde la fin)
-            if etape.get("courant") == self.graphe.arrivee:
+            stop_on_goal = self.algo_courant in {"DFS", "BFS", "Dijkstra"}
+            courant_visuel = etape.get("destination", etape.get("courant"))
+
+            # Stop goal seulement si l'algo le permet
+            if stop_on_goal and courant_visuel == self.graphe.arrivee:
                 parents = etape.get("parents")
                 if isinstance(parents, dict):
                     chemin = chemin_depuis_parents(parents, self.graphe.arrivee)
@@ -472,7 +475,7 @@ class ControleurApplication:
 
 
 
-        
+
 
 
 
