@@ -198,7 +198,7 @@ class VueApplication(ttk.Frame):
         ajouter_ligne_cout(0, "Noir",  "Bloqué")
         ajouter_ligne_cout(1, "Blanc", "1")
         ajouter_ligne_cout(2, "Bleu",  "5")
-        ajouter_ligne_cout(3, "Vert",  "3")
+        ajouter_ligne_cout(3, "Vert",  "2")
         ajouter_ligne_cout(4, "Jaune", "3")
 
         # ---- Légende ----
