@@ -277,7 +277,6 @@ class ControleurApplication:
         # Logs
         self.vue.logs_clear()
         self.vue.logs_append(f"Algo: {algo}")
-        self.vue.logs_append(f"Départ: {self.graphe.depart}  Arrivée: {self.graphe.arrivee}")
 
 
         # reset historique
@@ -606,6 +605,7 @@ class ControleurApplication:
         d_lig, d_col = self.vue.id_vers_lig_col(d)
         a_lig, a_col = self.vue.id_vers_lig_col(a)
 
+        self.vue.logs_append(f"Départ: (lig={d_lig + 1}, col={d_col + 1})")
         self.vue.logs_append(f"Arrivée: (lig={a_lig + 1}, col={a_col + 1})")
         self.vue.logs_append(f"Nombre d'étapes (algo): {nb_etapes_algo}")
 
