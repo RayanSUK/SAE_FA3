@@ -5,6 +5,7 @@ class Couleur(Enum):
     VERT = 2
     JAUNE = 3
     BLEU = 5
+    BLOQUE = 100000
 
 
 class Sommet:
@@ -55,9 +56,11 @@ class Graphe:
         return sommet.cout.value
 
     def bloquer_sommet(self, id: int):
+        print("En train de débloquer le sommet! (Depuis graphe/model)")
         self.obtenir_sommet(id).bloque = True
 
     def debloquer_sommet(self, id: int):
+        print("En train de débloquer le sommet! (Depuis graphe/model)")
         self.obtenir_sommet(id).bloque = False
 
     def definir_depart(self, id: int):
