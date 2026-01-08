@@ -26,6 +26,11 @@ class ControleurApplication:
         self.delai_base_ms = 100  # vitesse de base = ×1 (en ms)
         self.delai_ms = self.delai_base_ms
 
+        # --- Historique des étapes pour reculer/avancer ---
+        self.historique_etapes: list[dict] = []
+        self.index_etape: int = -1  # -1 => aucune étape affichée encore
+
+
     # ---------------- Utilitaires ----------------
     def sommet_id(self, lig, col):
         return lig * self.vue.nb_colonnes + col + 1
@@ -86,7 +91,27 @@ class ControleurApplication:
 
     # Actions de lecture
     def reculer_etape(self):
-        pass
+        # On ne recule que si on est en pause (comportement simple)
+        if not self.en_pause:
+            return
+
+        if not self.historique_etapes:
+            return
+
+        if self.index_etape <= 0:
+            return
+
+        # On enlève le chemin final si jamais il avait été tracé
+        if self.vue.ligne_chemin is not None:
+            try:
+                self.vue.canvas_graphe.delete(self.vue.ligne_chemin)
+            except Exception:
+                pass
+            self.vue.ligne_chemin = None
+
+        self.index_etape -= 1
+        etape = self.historique_etapes[self.index_etape]
+        self._afficher_etape(etape)
 
     def lancer_ou_pause(self):
         # Toggle pause/play
@@ -100,6 +125,7 @@ class ControleurApplication:
                 except Exception:
                     pass
                 self.after_id = None
+
     def avancer_etape(self):
         # Un seul pas si on est en pause
         if self.iterateur_algo is None:
@@ -107,12 +133,22 @@ class ControleurApplication:
         if not self.en_pause:
             return
 
+        # Si on a déjà des étapes "en avance" (après un retour arrière), on les rejoue
+        if self.index_etape < len(self.historique_etapes) - 1:
+            self.index_etape += 1
+            etape = self.historique_etapes[self.index_etape]
+            self._afficher_etape(etape)
+            return
+
+        # Sinon on lit une nouvelle étape depuis l'itérateur
         try:
             etape = next(self.iterateur_algo)
         except StopIteration:
             self.iterateur_algo = None
             return
 
+        self.historique_etapes.append(etape)
+        self.index_etape = len(self.historique_etapes) - 1
         self._afficher_etape(etape)
 
     def set_couleur(self, couleur):
@@ -185,6 +221,11 @@ class ControleurApplication:
         # stop animation précédente + reset affichage
         self.effacer_resultat()
 
+        # reset historique
+        self.historique_etapes = []
+        self.index_etape = -1
+
+
         if algo == "DFS":
             self.iterateur_algo = dfs_pas_a_pas(self.graphe)
         elif algo == "BFS":
@@ -213,6 +254,11 @@ class ControleurApplication:
         self.en_pause = True
         self.vue.effacer_resultat()
 
+
+        self.historique_etapes = []
+        self.index_etape = -1
+
+
     def effacer_tout(self):
         # Stop animation
         self.effacer_resultat()
@@ -232,22 +278,30 @@ class ControleurApplication:
         self.remettre_points_par_defaut()
 
     def _tick(self):
-        """Animation automatique """
+        """Animation automatique"""
         if self.en_pause or self.iterateur_algo is None:
             return
 
-        try:
-            etape = next(self.iterateur_algo)
-        except StopIteration:
-            self.iterateur_algo = None
-            self.after_id = None
-            self.en_pause = True
-            return
+        # Si on a reculé puis relancé play, on rejoue d'abord l'historique
+        if self.index_etape < len(self.historique_etapes) - 1:
+            self.index_etape += 1
+            etape = self.historique_etapes[self.index_etape]
+        else:
+            # Sinon, on consomme une nouvelle étape
+            try:
+                etape = next(self.iterateur_algo)
+            except StopIteration:
+                self.iterateur_algo = None
+                self.after_id = None
+                self.en_pause = True
+                return
+
+            self.historique_etapes.append(etape)
+            self.index_etape = len(self.historique_etapes) - 1
 
         self._afficher_etape(etape)
 
-        # Condition d'arrêt correcte : on stop quand le COURANT == ARRIVEE
-        # (important pour Dijkstra, sinon on s'arrêtes trop tôt)
+        # Stop quand le courant == arrivée
         if etape.get("courant") == self.graphe.arrivee:
             parents = etape.get("parents")
             if isinstance(parents, dict):
