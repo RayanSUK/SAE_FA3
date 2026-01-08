@@ -446,9 +446,9 @@ class VueApplication(ttk.Frame):
         for id_sommet in (self._fermes_prev - fermes):
             self._set_outline_case(id_sommet, "#d0d0d0", 1)
 
-        # 3) Appliquer style sur nouveaux ouverts / fermes
+        # 3) OUVERTS : on n'affiche plus (on remet normal au cas où)
         for id_sommet in (ouverts - self._ouverts_prev):
-            self._set_outline_case(id_sommet, "#1e90ff", 2)  # bleu
+            self._set_outline_case(id_sommet, "#d0d0d0", 1)
 
         for id_sommet in (fermes - self._fermes_prev):
             self._set_outline_case(id_sommet, "#808080", 2)  # gris
@@ -459,7 +459,7 @@ class VueApplication(ttk.Frame):
             if prev in fermes:
                 self._set_outline_case(prev, "#808080", 2)
             elif prev in ouverts:
-                self._set_outline_case(prev, "#1e90ff", 2)
+                self._set_outline_case(prev, "#d0d0d0", 1)
             else:
                 self._set_outline_case(prev, "#d0d0d0", 1)
 
