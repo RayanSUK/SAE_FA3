@@ -9,6 +9,7 @@ def bfs_pas_a_pas(graphe: Graphe):
     distances = {depart: 0}
     parents = {depart: None}
     visites = set()
+    iteration = 0
 
     while file:
         courant = file.popleft()
@@ -17,6 +18,7 @@ def bfs_pas_a_pas(graphe: Graphe):
         visites.add(courant)
 
         yield {
+            "iteration": iteration,
             "courant": courant,
             "ouverts": set(file),
             "fermes": visites.copy(),
@@ -35,6 +37,7 @@ def dfs_pas_a_pas(graphe: Graphe):
     pile = [depart]
     visites = set()
     parents = {depart: None}
+    iteration = 0
 
     while pile:
         courant = pile.pop()
@@ -43,8 +46,10 @@ def dfs_pas_a_pas(graphe: Graphe):
             continue
 
         visites.add(courant)
+        iteration += 1
 
         yield {
+            "iteration": iteration,
             "courant": courant,
             "ouverts": set(pile),
             "fermes": visites.copy(),
@@ -65,6 +70,7 @@ def dijkstra_pas_a_pas(graphe: Graphe):
 
     ouverts = [(0, depart)]
     fermes = set()
+    iteration = 0
 
     while ouverts:
         dist, u = heapq.heappop(ouverts)
@@ -72,8 +78,10 @@ def dijkstra_pas_a_pas(graphe: Graphe):
             continue
 
         fermes.add(u)
+        iteration += 1
 
         yield {
+            "iteration": iteration,
             "courant": u,
             "ouverts": {x[1] for x in ouverts},
             "fermes": fermes.copy(),
@@ -90,3 +98,68 @@ def dijkstra_pas_a_pas(graphe: Graphe):
                 distances[v] = nouveau
                 parents[v] = u
                 heapq.heappush(ouverts, (nouveau, v))
+
+def bellman_ford_pas_a_pas(graphe: Graphe):
+    depart = graphe.depart
+    distances = {id: math.inf for id in graphe.sommets}
+    parents = {id: None for id in graphe.sommets}
+    distances[depart] = 0
+
+    nb_sommets = len(graphe.sommets)
+    tous_les_sommets = list(graphe.sommets.keys())
+    iteration = 0
+
+    for phase in range(1, nb_sommets):
+        changement_dans_phase = False
+
+        for u in tous_les_sommets:
+            if graphe.obtenir_sommet(u).bloque or distances[u] == math.inf:
+                continue
+
+            for v in graphe.obtenir_voisins(u):
+                if graphe.obtenir_sommet(v).bloque: continue
+
+                nouveau_score = distances[u] + graphe.obtenir_cout(v)
+
+                if nouveau_score < distances[v]:
+                    distances[v] = nouveau_score
+                    parents[v] = u
+                    changement_dans_phase = True
+                    iteration += 1
+
+                    yield {
+                        "iteration": iteration,
+                        "phase": phase,
+                        "courant": u,
+                        "destination": v,
+                        "distances": distances.copy(),
+                        "parents": parents.copy(),
+                        "cycle_negatif": False
+                    }
+
+        if not changement_dans_phase:
+            break
+
+    for u in tous_les_sommets:
+        if distances[u] == math.inf: continue
+        for v in graphe.obtenir_voisins(u):
+            if not graphe.obtenir_sommet(v).bloque:
+                if distances[u] + graphe.obtenir_cout(v) < distances[v]:
+                    iteration += 1
+                    yield {
+                        "iteration": iteration,
+                        "phase": "Verification",
+                        "courant": u,
+                        "distances": distances.copy(),
+                        "parents": parents.copy(),
+                        "cycle_negatif": True
+                    }
+                    return
+
+def chemin_depuis_parents(parents: dict[int, int | None], arrivee: int) -> list[int]:
+    """
+    Reconstruit le chemin depuis la table des parents.
+    """
+    if parents[arrivee] is None:
+        return [arrivee]
+    return chemin_depuis_parents(parents, parents[arrivee]) + [arrivee]
