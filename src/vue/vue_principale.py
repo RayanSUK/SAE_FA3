@@ -61,7 +61,7 @@ class VueApplication(ttk.Frame):
         # --- Grille ---
         self.nb_lignes = 30
         self.nb_colonnes = 44
-        self.taille_case = 32  # px (change si tu veux plus grand/petit)
+        self.taille_case = 24  # px (change si tu veux plus grand/petit)
 
         self.rectangles_cases = [[None for _ in range(self.nb_colonnes)] for _ in range(self.nb_lignes)]
 
@@ -85,11 +85,47 @@ class VueApplication(ttk.Frame):
 
     # ---------------- Zone Propriétés ----------------
     def construire_zone_proprietes(self):
+        # Cadre fixe à droite
         self.zone_droite = ttk.Frame(self, style="Card.TFrame", width=340)
-        self.zone_droite.grid(row=0, column=1, sticky="ns", padx=(8, 10), pady=10)
+        self.zone_droite.grid(row=0, column=1, sticky="nsew", padx=(8, 10), pady=10)
         self.zone_droite.grid_propagate(False)
 
-        self.construire_proprietes(self.zone_droite)
+        self.zone_droite.rowconfigure(0, weight=1)
+        self.zone_droite.columnconfigure(0, weight=1)
+
+        # Canvas + scrollbar (scroll vertical)
+        self.props_canvas = tk.Canvas(self.zone_droite, highlightthickness=0)
+        self.props_canvas.grid(row=0, column=0, sticky="nsew")
+
+        self.props_scroll = ttk.Scrollbar(self.zone_droite, orient="vertical", command=self.props_canvas.yview)
+        self.props_scroll.grid(row=0, column=1, sticky="ns")
+
+        self.props_canvas.configure(yscrollcommand=self.props_scroll.set)
+
+        # Frame interne dans le canvas
+        self.props_frame = ttk.Frame(self.props_canvas)
+        self.props_window_id = self.props_canvas.create_window((0, 0), window=self.props_frame, anchor="nw")
+
+        # Met à jour la zone scrollable quand le contenu change
+        def _on_frame_configure(event):
+            self.props_canvas.configure(scrollregion=self.props_canvas.bbox("all"))
+
+        # Force la frame à prendre la largeur du canvas (sinon c’est tout serré)
+        def _on_canvas_configure(event):
+            self.props_canvas.itemconfig(self.props_window_id, width=event.width)
+
+        self.props_frame.bind("<Configure>", _on_frame_configure)
+        self.props_canvas.bind("<Configure>", _on_canvas_configure)
+
+        #On construit maintenant les propriétés dans la frame scrollable
+        self.construire_proprietes(self.props_frame)
+
+        # Bonus : molette pour scroller le panneau
+        def _on_mousewheel(e):
+            # Windows/mac : delta ; Linux : Button-4/5 géré ailleurs
+            self.props_canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
+
+        self.props_canvas.bind_all("<MouseWheel>", _on_mousewheel)  # Windows
 
     # ---------------- Tuile couleur ----------------
     def creer_tuile_couleur(self, parent, nom: str, couleur: str):
