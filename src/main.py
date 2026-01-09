@@ -7,7 +7,7 @@ from controleur.controleur import ControleurApplication
 
 def main():
     root = tk.Tk()
-    root.title("Visualisation de plus court chemin")
+    root.title("Logiciel de visualisation d'algorithmes sur un graphe")
     root.geometry("1400x900")
 
     # View
